@@ -1,0 +1,284 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #fff;
+  color: #111;
+  -webkit-font-smoothing: antialiased;
+}
+
+header {
+  padding: 48px 48px 32px;
+}
+
+header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #111;
+}
+
+main {
+  padding: 0 48px 80px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 40px 32px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  background: #f0f0f0;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.card-name {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #111;
+}
+
+.card-trade {
+  font-size: 13px;
+  font-weight: 400;
+  color: #888;
+}
+
+/* Modal */
+
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0 0 500px 0;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.modal {
+  position: relative;
+  background: #fff;
+  max-width: 780px;
+  width: calc(100% - 48px);
+  max-height: calc(100vh - 500px - 48px);
+  overflow-y: auto;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.modal-close:hover {
+  color: #111;
+}
+
+.modal-image {
+  width: 280px;
+  flex-shrink: 0;
+  display: block;
+  object-fit: cover;
+  object-position: top;
+}
+
+.modal-info {
+  flex: 1;
+  padding: 32px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.modal-name {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #111;
+}
+
+.modal-trade {
+  font-size: 13px;
+  font-weight: 400;
+  color: #888;
+}
+
+.modal-bio {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: #444;
+}
+
+.modal-works {
+  display: none;
+}
+
+/* Gallery strip */
+
+.gallery-strip {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 500px;
+  background: #fff;
+  z-index: 101;
+  overflow: hidden;
+}
+
+.gallery-strip.open {
+  display: flex;
+  align-items: stretch;
+}
+
+.gallery-track {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  gap: 2px;
+}
+
+.gallery-track::-webkit-scrollbar {
+  display: none;
+}
+
+.gallery-track img {
+  height: 100%;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: cover;
+  display: block;
+  background: #f0f0f0;
+}
+
+.gallery-arrow {
+  position: relative;
+  z-index: 1;
+  width: 56px;
+  flex-shrink: 0;
+  background: #fff;
+  border: none;
+  font-size: 18px;
+  color: #111;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.gallery-arrow:hover {
+  background: #f5f5f5;
+}
+
+.card {
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  header {
+    padding: 32px 24px 24px;
+  }
+
+  main {
+    padding: 0 24px 60px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px 20px;
+  }
+
+  .modal-backdrop {
+    inset: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .modal {
+    max-height: 90vh;
+  }
+
+  .modal-body {
+    flex-direction: column;
+  }
+
+  .modal-image {
+    width: 100%;
+    height: 260px;
+    order: -1;
+  }
+
+  .modal-info {
+    padding: 20px 24px 24px;
+  }
+
+  .modal-works {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 20px;
+  }
+
+  .modal-works img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    display: block;
+    background: #f0f0f0;
+  }
+
+  .gallery-strip {
+    display: none !important;
+  }
+}

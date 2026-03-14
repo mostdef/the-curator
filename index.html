@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Braitrust</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;900&family=Oswald:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Braitrust</h1>
+  </header>
+
+  <main>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal" id="modal">
+      <button class="modal-close" id="modal-close">&#x2715;</button>
+      <div class="modal-body">
+        <div class="modal-info">
+          <span class="modal-name" id="modal-name"></span>
+          <span class="modal-trade" id="modal-trade"></span>
+          <p class="modal-bio" id="modal-bio"></p>
+          <div class="modal-works" id="modal-works"></div>
+        </div>
+        <img class="modal-image" id="modal-image" src="" alt="" />
+      </div>
+    </div>
+  </div>
+
+  <div class="gallery-strip" id="gallery-strip">
+    <button class="gallery-arrow gallery-arrow-left" id="gallery-prev">&#8592;</button>
+    <div class="gallery-track" id="gallery-track"></div>
+    <button class="gallery-arrow gallery-arrow-right" id="gallery-next">&#8594;</button>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
