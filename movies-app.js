@@ -205,7 +205,7 @@ let grainLevel = 0.45;
 function applyGrain() {
   const opacity = grainEnabled ? grainLevel : 0;
   document.querySelectorAll('.poster-texture-hl').forEach(el => {
-    el.style.opacity = Math.min(1, opacity * 1.05);
+    el.style.opacity = Math.min(1, opacity * 1.10);
   });
   document.querySelectorAll('.poster-texture-sh').forEach(el => {
     el.style.opacity = opacity;
