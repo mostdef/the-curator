@@ -44,10 +44,8 @@ function generateFoldTexture() {
 
   // Fold patterns that produce 6 or 8 rectangular sections
   const patterns = [
-    { h: [1/3, 2/3], v: [1/2] },         // 3 rows × 2 cols = 6
-    { h: [1/2],      v: [1/3, 2/3] },    // 2 rows × 3 cols = 6
-    { h: [1/4, 1/2, 3/4], v: [1/2] },    // 4 rows × 2 cols = 8
-    { h: [1/2],      v: [1/4, 1/2, 3/4] }, // 2 rows × 4 cols = 8
+    { h: [1/3, 2/3],       v: [1/2] }, // 3 rows × 2 cols = 6
+    { h: [1/4, 1/2, 3/4], v: [1/2] }, // 4 rows × 2 cols = 8
   ];
   const pattern = patterns[Math.floor(Math.random() * patterns.length)];
 
