@@ -1,5 +1,30 @@
 const grid = document.getElementById('grid');
 
+function drawCrease(ctx, pos, isHorizontal, w, h) {
+  const len = (isHorizontal ? w : h) * 1.6;
+  const angle = (Math.random() - 0.5) * 0.04;
+
+  ctx.save();
+  ctx.translate(isHorizontal ? w / 2 : pos, isHorizontal ? pos : h / 2);
+  ctx.rotate(angle);
+
+  const hl = ctx.createLinearGradient(0, -5, 0, 2);
+  hl.addColorStop(0, 'rgba(255,255,255,0)');
+  hl.addColorStop(0.5, 'rgba(255,255,255,0.92)');
+  hl.addColorStop(1, 'rgba(255,255,255,0.05)');
+  ctx.fillStyle = hl;
+  ctx.fillRect(-len / 2, -5, len, 7);
+
+  const sh = ctx.createLinearGradient(0, 1, 0, 14);
+  sh.addColorStop(0, 'rgba(0,0,0,0.55)');
+  sh.addColorStop(0.35, 'rgba(0,0,0,0.18)');
+  sh.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sh;
+  ctx.fillRect(-len / 2, 1, len, 13);
+
+  ctx.restore();
+}
+
 function generateFoldTexture() {
   const w = 400, h = 600;
   const canvas = document.createElement('canvas');
@@ -7,7 +32,7 @@ function generateFoldTexture() {
   canvas.height = h;
   const ctx = canvas.getContext('2d');
 
-  // Grain: centered around mid-grey so overlay blend mode stays mostly neutral
+  // Grain centered around mid-grey (neutral for overlay blend mode)
   const id = ctx.createImageData(w, h);
   const d = id.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -17,37 +42,20 @@ function generateFoldTexture() {
   }
   ctx.putImageData(id, 0, 0);
 
-  // Fold creases: 2–4 lines, mostly horizontal (like a poster folded for storage)
-  const foldCount = 2 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < foldCount; i++) {
-    const isHorizontal = Math.random() > 0.28;
-    const dim = isHorizontal ? h : w;
-    const pos = dim * (0.18 + Math.random() * 0.64);
-    const angle = (Math.random() - 0.5) * 0.05; // slight organic tilt ±~3°
-    const len = (isHorizontal ? w : h) * 1.6;
+  // Fold patterns that produce 6 or 8 rectangular sections
+  const patterns = [
+    { h: [1/3, 2/3], v: [1/2] },         // 3 rows × 2 cols = 6
+    { h: [1/2],      v: [1/3, 2/3] },    // 2 rows × 3 cols = 6
+    { h: [1/4, 1/2, 3/4], v: [1/2] },    // 4 rows × 2 cols = 8
+    { h: [1/2],      v: [1/4, 1/2, 3/4] }, // 2 rows × 4 cols = 8
+  ];
+  const pattern = patterns[Math.floor(Math.random() * patterns.length)];
 
-    ctx.save();
-    ctx.translate(isHorizontal ? w / 2 : pos, isHorizontal ? pos : h / 2);
-    ctx.rotate(angle);
+  // Slight positional imprecision makes folds feel hand-folded
+  const jitter = () => (Math.random() - 0.5) * 6;
 
-    // Bright edge (light catching the raised crease)
-    const hl = ctx.createLinearGradient(0, -5, 0, 2);
-    hl.addColorStop(0, 'rgba(255,255,255,0)');
-    hl.addColorStop(0.5, 'rgba(255,255,255,0.92)');
-    hl.addColorStop(1, 'rgba(255,255,255,0.05)');
-    ctx.fillStyle = hl;
-    ctx.fillRect(-len / 2, -5, len, 7);
-
-    // Shadow groove beside the crease
-    const sh = ctx.createLinearGradient(0, 1, 0, 14);
-    sh.addColorStop(0, 'rgba(0,0,0,0.55)');
-    sh.addColorStop(0.35, 'rgba(0,0,0,0.18)');
-    sh.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sh;
-    ctx.fillRect(-len / 2, 1, len, 13);
-
-    ctx.restore();
-  }
+  pattern.h.forEach(t => drawCrease(ctx, h * t + jitter(), true,  w, h));
+  pattern.v.forEach(t => drawCrease(ctx, w * t + jitter(), false, w, h));
 
   return canvas.toDataURL('image/png');
 }
