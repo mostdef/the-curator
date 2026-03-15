@@ -81,6 +81,8 @@ main {
   position: relative;
   box-shadow: 0 2px 12px rgba(0,0,0,0.1);
   will-change: transform;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
 }
 
 .movie-card {
