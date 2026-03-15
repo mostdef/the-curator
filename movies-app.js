@@ -46,6 +46,23 @@ function drawCrease(ctx, pos, isHorizontal, w, h, strength = 1) {
   ctx.restore();
 }
 
+function drawSectionDiffraction(ctx, x1, y1, x2, y2) {
+  const cx = (x1 + x2) / 2;
+  const cy = (y1 + y2) / 2;
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.5;
+  const dx = Math.cos(angle) * r;
+  const dy = Math.sin(angle) * r;
+  const intensity = 0.07 + Math.random() * 0.11;
+
+  const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
+  grad.addColorStop(0, `rgba(255,255,255,${intensity})`);
+  grad.addColorStop(1, `rgba(0,0,0,${intensity})`);
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+}
+
 function generateFoldTexture() {
   const w = 400, h = 600;
   const canvas = document.createElement('canvas');
@@ -63,16 +80,23 @@ function generateFoldTexture() {
   }
   ctx.putImageData(id, 0, 0);
 
-  // Fold patterns that produce 6 or 8 rectangular sections
   const patterns = [
     { h: [1/3, 2/3],       v: [1/2] }, // 3 rows × 2 cols = 6
     { h: [1/4, 1/2, 3/4], v: [1/2] }, // 4 rows × 2 cols = 8
   ];
   const pattern = patterns[Math.floor(Math.random() * patterns.length)];
 
-  // Slight positional imprecision makes folds feel hand-folded
-  const jitter = () => (Math.random() - 0.5) * 6;
+  // Draw per-section light diffraction first, then fold lines on top
+  const hBounds = [0, ...pattern.h.map(t => h * t), h];
+  const vBounds = [0, ...pattern.v.map(t => w * t), w];
 
+  for (let row = 0; row < hBounds.length - 1; row++) {
+    for (let col = 0; col < vBounds.length - 1; col++) {
+      drawSectionDiffraction(ctx, vBounds[col], hBounds[row], vBounds[col + 1], hBounds[row + 1]);
+    }
+  }
+
+  const jitter = () => (Math.random() - 0.5) * 6;
   pattern.h.forEach(t => drawCrease(ctx, h * t + jitter(), true,  w, h, 1));
   pattern.v.forEach(t => drawCrease(ctx, w * t + jitter(), false, w, h, 2.2));
 
