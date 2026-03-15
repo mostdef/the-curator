@@ -76,10 +76,14 @@ main {
   aspect-ratio: 2 / 3;
 }
 
-.movie-card {
+.movie-card,
+.people-card {
   position: relative;
   box-shadow: 0 2px 12px rgba(0,0,0,0.1);
   will-change: transform;
+}
+
+.movie-card {
   gap: 8px;
 }
 
