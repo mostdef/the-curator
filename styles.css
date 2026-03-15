@@ -82,6 +82,23 @@ main {
   will-change: transform;
 }
 
+.movie-card .card-info {
+  padding: 0 2px;
+  margin-top: 2px;
+}
+
+.movie-card .card-name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.movie-card .card-trade {
+  font-size: 12px;
+  margin-top: 1px;
+}
+
 .card-sheen {
   position: absolute;
   inset: 0;
