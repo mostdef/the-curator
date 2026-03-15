@@ -52,6 +52,107 @@ main {
   padding: 0 48px 80px;
 }
 
+.recommendation {
+  margin-bottom: 56px;
+}
+
+.rec-heading {
+  font-size: 13px;
+  font-weight: 500;
+  color: #bbb;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+}
+
+.rec-card {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 480px;
+}
+
+.rec-poster-wrap {
+  position: relative;
+  flex-shrink: 0;
+  isolation: isolate;
+  width: 100px;
+}
+
+.rec-poster {
+  display: block;
+  width: 100px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+}
+
+.rec-info {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rec-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: 16px;
+  color: #111;
+  letter-spacing: 0;
+}
+
+.rec-meta {
+  font-size: 12px;
+  color: #888;
+}
+
+.rec-reason {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #555;
+}
+
+.rec-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rec-btn {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.rec-btn:hover {
+  opacity: 0.75;
+}
+
+.rec-btn-primary {
+  background: #111;
+  color: #fff;
+}
+
+.rec-btn-secondary {
+  background: #f0f0f0;
+  color: #111;
+}
+
+.rec-empty {
+  font-size: 13px;
+  color: #bbb;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

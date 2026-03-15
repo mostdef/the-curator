@@ -195,6 +195,125 @@ function render(list) {
   });
 }
 
+const recPool = [
+  { title: "Reservoir Dogs",     year: 1992, director: "Quentin Tarantino", poster: "images/posters/reservoir-dogs.jpg",                             reason: "Tarantino's debut — the one missing film from an otherwise complete collection of his work." },
+  { title: "Goodfellas",         year: 1990, director: "Martin Scorsese",   poster: "https://image.tmdb.org/t/p/w500/9OkCLM73MIU2CrKZbqiT8Ln1wY2.jpg", reason: "Scorsese's crime masterpiece sits right alongside Casino and Taxi Driver already in the list." },
+  { title: "Fight Club",         year: 1999, director: "David Fincher",     poster: "https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",  reason: "Fincher is here with The Killer — Fight Club is the film that defines his entire aesthetic." },
+  { title: "The Dark Knight",    year: 2008, director: "Christopher Nolan", poster: "https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg",  reason: "Nolan has three films in this list. This is the one everyone expects to find." },
+  { title: "Arrival",            year: 2016, director: "Denis Villeneuve",  poster: "https://image.tmdb.org/t/p/w500/pEzNVQfdzYDzVK0XqxERIw2x2se.jpg",  reason: "Villeneuve's Dune films are here — Arrival is his most emotionally precise sci-fi work." },
+  { title: "There Will Be Blood", year: 2007, director: "Paul Thomas Anderson", poster: "https://image.tmdb.org/t/p/w500/fa0RDkAlCec0STeMNAhPaF89q6U.jpg", reason: "PTA is already in the list with One Battle After Another — this is his undisputed peak." },
+  { title: "Hereditary",         year: 2018, director: "Ari Aster",         poster: "https://image.tmdb.org/t/p/w500/hjlZSXM86wJrfCv5VKfR5DI2VeU.jpg",  reason: "Aster's Eddington is here — Hereditary is the film that announced him as a major voice." },
+  { title: "Blade Runner 2049",  year: 2017, director: "Denis Villeneuve",  poster: "https://image.tmdb.org/t/p/w500/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg",  reason: "A natural companion to Dune — Villeneuve at his most visually ambitious." },
+  { title: "Apocalypse Now",     year: 1979, director: "Francis Ford Coppola", poster: "https://image.tmdb.org/t/p/w500/gQB8Y5RCMkv2zwzFHbUJX3kAhvA.jpg", reason: "The Godfather trilogy and The Conversation are here — this completes Coppola's essential run." },
+];
+
+let recIndex = 0;
+
+function getCurrentRec() {
+  for (let i = 0; i < recPool.length; i++) {
+    const candidate = recPool[(recIndex + i) % recPool.length];
+    if (!movies.find(m => m.title === candidate.title)) return candidate;
+  }
+  return null;
+}
+
+function renderRecommendation() {
+  const wrap = document.getElementById('recommendation');
+  wrap.innerHTML = '';
+
+  const rec = getCurrentRec();
+
+  const heading = document.createElement('div');
+  heading.className = 'rec-heading';
+  heading.textContent = 'Something New To Watch Today?!';
+
+  if (!rec) {
+    const empty = document.createElement('p');
+    empty.className = 'rec-empty';
+    empty.textContent = 'All recommendations have been added to your list.';
+    wrap.appendChild(heading);
+    wrap.appendChild(empty);
+    return;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'rec-card';
+
+  const textures = generateFoldTextures();
+  const posterWrap = document.createElement('div');
+  posterWrap.className = 'rec-poster-wrap';
+
+  const img = document.createElement('img');
+  img.className = 'rec-poster';
+  img.src = rec.poster;
+  img.alt = rec.title;
+
+  const hlDiv = document.createElement('div');
+  hlDiv.className = 'poster-texture poster-texture-hl';
+  hlDiv.style.backgroundImage = `url(${textures.hl})`;
+
+  const shDiv = document.createElement('div');
+  shDiv.className = 'poster-texture poster-texture-sh';
+  shDiv.style.backgroundImage = `url(${textures.sh})`;
+
+  posterWrap.appendChild(img);
+  posterWrap.appendChild(hlDiv);
+  posterWrap.appendChild(shDiv);
+
+  const info = document.createElement('div');
+  info.className = 'rec-info';
+
+  const title = document.createElement('span');
+  title.className = 'rec-title';
+  title.textContent = rec.title;
+
+  const meta = document.createElement('span');
+  meta.className = 'rec-meta';
+  meta.textContent = `${rec.director}, ${rec.year}`;
+
+  const reason = document.createElement('p');
+  reason.className = 'rec-reason';
+  reason.textContent = rec.reason;
+
+  const buttons = document.createElement('div');
+  buttons.className = 'rec-buttons';
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'rec-btn rec-btn-primary';
+  addBtn.textContent = 'Already Seen';
+  addBtn.addEventListener('click', () => {
+    movies.unshift({ title: rec.title, year: rec.year, director: rec.director, poster: rec.poster });
+    render(movies);
+    recIndex = (recPool.indexOf(rec) + 1) % recPool.length;
+    renderRecommendation();
+    applyGrain();
+  });
+
+  const newBtn = document.createElement('button');
+  newBtn.className = 'rec-btn rec-btn-secondary';
+  newBtn.textContent = 'Recommend new';
+  newBtn.addEventListener('click', () => {
+    recIndex = (recPool.indexOf(rec) + 1) % recPool.length;
+    renderRecommendation();
+  });
+
+  buttons.appendChild(addBtn);
+  buttons.appendChild(newBtn);
+
+  info.appendChild(title);
+  info.appendChild(meta);
+  info.appendChild(reason);
+  info.appendChild(buttons);
+
+  card.appendChild(posterWrap);
+  card.appendChild(info);
+
+  wrap.appendChild(heading);
+  wrap.appendChild(card);
+}
+
+renderRecommendation();
+
 render(movies);
 
 Sortable.create(grid, {
