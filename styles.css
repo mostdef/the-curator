@@ -88,7 +88,7 @@ main {
   inset: 0;
   pointer-events: none;
   background-size: 100% 100%;
-  mix-blend-mode: overlay;
+  mix-blend-mode: soft-light;
   opacity: 0.45;
   transition: opacity 0.4s ease;
 }

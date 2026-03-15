@@ -3,8 +3,8 @@ const grid = document.getElementById('grid');
 function drawCrease(ctx, pos, isHorizontal, w, h, strength = 1) {
   const len = (isHorizontal ? w : h) * 1.6;
   const spread = Math.round(18 * strength);
-  const hlOpacity = Math.min(1, 0.92 * strength);
-  const shOpacity = Math.min(1, 0.6 * strength);
+  const hlOpacity = Math.min(1, 1.1 * strength);
+  const shOpacity = Math.min(1, 0.75 * strength);
   const angle = (Math.random() - 0.5) * 0.04;
 
   ctx.save();
@@ -53,7 +53,7 @@ function drawSectionDiffraction(ctx, x1, y1, x2, y2) {
   const r = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.5;
   const dx = Math.cos(angle) * r;
   const dy = Math.sin(angle) * r;
-  const intensity = 0.07 + Math.random() * 0.11;
+  const intensity = 0.12 + Math.random() * 0.16;
 
   const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
   grad.addColorStop(0, `rgba(255,255,255,${intensity})`);
