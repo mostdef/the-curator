@@ -94,6 +94,7 @@ main {
 
 .poster-texture-hl {
   mix-blend-mode: screen;
+  opacity: 0.47;
 }
 
 .poster-texture-sh {
