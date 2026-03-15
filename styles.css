@@ -87,19 +87,22 @@ main {
   gap: 8px;
 }
 
-.movie-card .card-info {
+.movie-card .card-info,
+.people-card .card-info {
   padding: 0 0 8px 4px;
   margin-top: 0;
 }
 
-.movie-card .card-name {
+.movie-card .card-name,
+.people-card .card-name {
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 600;
   font-size: 14px;
   letter-spacing: 0;
 }
 
-.movie-card .card-trade {
+.movie-card .card-trade,
+.people-card .card-trade {
   font-size: 12px;
   margin-top: 1px;
 }
