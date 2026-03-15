@@ -1,21 +1,54 @@
 const grid = document.getElementById('grid');
 
-function generateNoiseTexture() {
-  const size = 128;
+function generateFoldTexture() {
+  const w = 400, h = 600;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d');
-  const imageData = ctx.createImageData(size, size);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const v = Math.floor(Math.random() * 255);
-    data[i]     = v;
-    data[i + 1] = v;
-    data[i + 2] = v;
-    data[i + 3] = Math.floor(Math.random() * 38);
+
+  // Grain: centered around mid-grey so overlay blend mode stays mostly neutral
+  const id = ctx.createImageData(w, h);
+  const d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = Math.floor(128 + (Math.random() - 0.5) * 90);
+    d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = Math.floor(Math.random() * 28 + 4);
   }
-  ctx.putImageData(imageData, 0, 0);
+  ctx.putImageData(id, 0, 0);
+
+  // Fold creases: 2–4 lines, mostly horizontal (like a poster folded for storage)
+  const foldCount = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < foldCount; i++) {
+    const isHorizontal = Math.random() > 0.28;
+    const dim = isHorizontal ? h : w;
+    const pos = dim * (0.18 + Math.random() * 0.64);
+    const angle = (Math.random() - 0.5) * 0.05; // slight organic tilt ±~3°
+    const len = (isHorizontal ? w : h) * 1.6;
+
+    ctx.save();
+    ctx.translate(isHorizontal ? w / 2 : pos, isHorizontal ? pos : h / 2);
+    ctx.rotate(angle);
+
+    // Bright edge (light catching the raised crease)
+    const hl = ctx.createLinearGradient(0, -5, 0, 2);
+    hl.addColorStop(0, 'rgba(255,255,255,0)');
+    hl.addColorStop(0.5, 'rgba(255,255,255,0.92)');
+    hl.addColorStop(1, 'rgba(255,255,255,0.05)');
+    ctx.fillStyle = hl;
+    ctx.fillRect(-len / 2, -5, len, 7);
+
+    // Shadow groove beside the crease
+    const sh = ctx.createLinearGradient(0, 1, 0, 14);
+    sh.addColorStop(0, 'rgba(0,0,0,0.55)');
+    sh.addColorStop(0.35, 'rgba(0,0,0,0.18)');
+    sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(-len / 2, 1, len, 13);
+
+    ctx.restore();
+  }
+
   return canvas.toDataURL('image/png');
 }
 
@@ -61,7 +94,7 @@ function render(list) {
 
     const texture = document.createElement('div');
     texture.className = 'poster-texture';
-    texture.style.backgroundImage = `url(${generateNoiseTexture()})`;
+    texture.style.backgroundImage = `url(${generateFoldTexture()})`;
 
     imgWrap.appendChild(img);
     imgWrap.appendChild(texture);
@@ -89,8 +122,28 @@ function render(list) {
 
 render(movies);
 
-document.getElementById('texture-toggle').addEventListener('click', function () {
-  const off = document.body.classList.toggle('textures-off');
-  this.textContent = off ? 'Grain off' : 'Grain on';
-  this.classList.toggle('inactive', off);
+// Controls
+let grainEnabled = true;
+let grainLevel = 0.45;
+
+function applyGrain() {
+  const opacity = grainEnabled ? grainLevel : 0;
+  document.querySelectorAll('.poster-texture').forEach(el => {
+    el.style.opacity = opacity;
+  });
+}
+
+const toggle = document.getElementById('texture-toggle');
+const slider = document.getElementById('grain-slider');
+
+toggle.addEventListener('click', () => {
+  grainEnabled = !grainEnabled;
+  toggle.classList.toggle('inactive', !grainEnabled);
+  slider.disabled = !grainEnabled;
+  applyGrain();
+});
+
+slider.addEventListener('input', () => {
+  grainLevel = parseFloat(slider.value);
+  applyGrain();
 });

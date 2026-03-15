@@ -87,21 +87,23 @@ main {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-size: 128px 128px;
-  background-repeat: repeat;
+  background-size: 100% 100%;
   mix-blend-mode: overlay;
   opacity: 0.45;
   transition: opacity 0.4s ease;
 }
 
-body.textures-off .poster-texture {
-  opacity: 0;
-}
-
-.texture-toggle {
+.grain-control {
   position: fixed;
   top: 68px;
   right: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+
+.texture-toggle {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
@@ -111,8 +113,8 @@ body.textures-off .poster-texture {
   border: none;
   cursor: pointer;
   padding: 0;
-  z-index: 10;
   transition: color 0.15s;
+  white-space: nowrap;
 }
 
 .texture-toggle.inactive {
@@ -121,6 +123,40 @@ body.textures-off .poster-texture {
 
 .texture-toggle:hover {
   color: #111;
+}
+
+.grain-slider {
+  width: 72px;
+  height: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #ccc;
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.grain-slider:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.grain-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #111;
+  cursor: pointer;
+}
+
+.grain-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #111;
+  border: none;
+  cursor: pointer;
 }
 
 .movie-card,
