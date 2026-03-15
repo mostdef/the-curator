@@ -1,106 +1,124 @@
 const grid = document.getElementById('grid');
 
-function drawCrease(ctx, pos, isHorizontal, w, h, strength = 1) {
+function drawCreasePart(ctx, pos, isHorizontal, w, h, strength, isHighlight, angle) {
   const len = (isHorizontal ? w : h) * 1.6;
-  const spread = Math.round(18 * strength);
   const hlOpacity = Math.min(1, 1.1 * strength);
   const shOpacity = Math.min(1, 0.75 * strength);
-  const angle = (Math.random() - 0.5) * 0.04;
+  const spread = Math.round(18 * strength);
 
   ctx.save();
   ctx.translate(isHorizontal ? w / 2 : pos, isHorizontal ? pos : h / 2);
   ctx.rotate(angle);
 
   if (isHorizontal) {
-    // Gradient runs top → bottom (perpendicular to horizontal crease)
-    const hl = ctx.createLinearGradient(0, -5, 0, 2);
-    hl.addColorStop(0, 'rgba(255,255,255,0)');
-    hl.addColorStop(0.5, `rgba(255,255,255,${hlOpacity})`);
-    hl.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = hl;
-    ctx.fillRect(-len / 2, -5, len, 7);
-
-    const sh = ctx.createLinearGradient(0, 1, 0, spread);
-    sh.addColorStop(0, `rgba(0,0,0,${shOpacity})`);
-    sh.addColorStop(0.4, `rgba(0,0,0,${shOpacity * 0.35})`);
-    sh.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sh;
-    ctx.fillRect(-len / 2, 1, len, spread);
+    if (isHighlight) {
+      const hl = ctx.createLinearGradient(0, -5, 0, 2);
+      hl.addColorStop(0, 'rgba(255,255,255,0)');
+      hl.addColorStop(0.5, `rgba(255,255,255,${hlOpacity})`);
+      hl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hl;
+      ctx.fillRect(-len / 2, -5, len, 7);
+    } else {
+      const sh = ctx.createLinearGradient(0, 1, 0, spread);
+      sh.addColorStop(0, `rgba(0,0,0,${shOpacity})`);
+      sh.addColorStop(0.4, `rgba(0,0,0,${shOpacity * 0.35})`);
+      sh.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sh;
+      ctx.fillRect(-len / 2, 1, len, spread);
+    }
   } else {
-    // Gradient runs left → right (perpendicular to vertical crease)
-    const hl = ctx.createLinearGradient(-5, 0, 2, 0);
-    hl.addColorStop(0, 'rgba(255,255,255,0)');
-    hl.addColorStop(0.5, `rgba(255,255,255,${hlOpacity})`);
-    hl.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = hl;
-    ctx.fillRect(-5, -len / 2, 7, len);
-
-    const sh = ctx.createLinearGradient(1, 0, spread, 0);
-    sh.addColorStop(0, `rgba(0,0,0,${shOpacity})`);
-    sh.addColorStop(0.4, `rgba(0,0,0,${shOpacity * 0.35})`);
-    sh.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sh;
-    ctx.fillRect(1, -len / 2, spread, len);
+    if (isHighlight) {
+      const hl = ctx.createLinearGradient(-5, 0, 2, 0);
+      hl.addColorStop(0, 'rgba(255,255,255,0)');
+      hl.addColorStop(0.5, `rgba(255,255,255,${hlOpacity})`);
+      hl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hl;
+      ctx.fillRect(-5, -len / 2, 7, len);
+    } else {
+      const sh = ctx.createLinearGradient(1, 0, spread, 0);
+      sh.addColorStop(0, `rgba(0,0,0,${shOpacity})`);
+      sh.addColorStop(0.4, `rgba(0,0,0,${shOpacity * 0.35})`);
+      sh.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sh;
+      ctx.fillRect(1, -len / 2, spread, len);
+    }
   }
 
   ctx.restore();
 }
 
-function drawSectionDiffraction(ctx, x1, y1, x2, y2) {
-  const cx = (x1 + x2) / 2;
-  const cy = (y1 + y2) / 2;
-  const angle = Math.random() * Math.PI * 2;
-  const r = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.5;
-  const dx = Math.cos(angle) * r;
-  const dy = Math.sin(angle) * r;
-  const intensity = 0.12 + Math.random() * 0.16;
-
-  const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
-  grad.addColorStop(0, `rgba(255,255,255,${intensity})`);
-  grad.addColorStop(1, `rgba(0,0,0,${intensity})`);
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
-}
-
-function generateFoldTexture() {
+function generateFoldTextures() {
   const w = 400, h = 600;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-
-  // Grain centered around mid-grey (neutral for overlay blend mode)
-  const id = ctx.createImageData(w, h);
-  const d = id.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const v = Math.floor(128 + (Math.random() - 0.5) * 90);
-    d[i] = d[i + 1] = d[i + 2] = v;
-    d[i + 3] = Math.floor(Math.random() * 28 + 4);
-  }
-  ctx.putImageData(id, 0, 0);
 
   const patterns = [
-    { h: [1/3, 2/3],       v: [1/2] }, // 3 rows × 2 cols = 6
-    { h: [1/4, 1/2, 3/4], v: [1/2] }, // 4 rows × 2 cols = 8
+    { h: [1/3, 2/3], v: [1/2] },
+    { h: [1/4, 1/2, 3/4], v: [1/2] },
   ];
-  const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+  const pat = patterns[Math.floor(Math.random() * patterns.length)];
 
-  // Draw per-section light diffraction first, then fold lines on top
-  const hBounds = [0, ...pattern.h.map(t => h * t), h];
-  const vBounds = [0, ...pattern.v.map(t => w * t), w];
+  // Pre-generate all random parameters so both canvases are spatially aligned
+  const hPos = pat.h.map(t => h * t + (Math.random() - 0.5) * 6);
+  const vPos = pat.v.map(t => w * t + (Math.random() - 0.5) * 6);
+  const hBounds = [0, ...hPos, h];
+  const vBounds = [0, ...vPos, w];
 
-  for (let row = 0; row < hBounds.length - 1; row++) {
-    for (let col = 0; col < vBounds.length - 1; col++) {
-      drawSectionDiffraction(ctx, vBounds[col], hBounds[row], vBounds[col + 1], hBounds[row + 1]);
+  const sectionData = hBounds.slice(0, -1).map(() =>
+    vBounds.slice(0, -1).map(() => ({
+      angle: Math.random() * Math.PI * 2,
+      intensity: 0.12 + Math.random() * 0.14,
+    }))
+  );
+  const hAngles = hPos.map(() => (Math.random() - 0.5) * 0.04);
+  const vAngles = vPos.map(() => (Math.random() - 0.5) * 0.04);
+
+  function buildCanvas(isHighlight) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    // Black = neutral for screen; white = neutral for multiply
+    ctx.fillStyle = isHighlight ? '#000' : '#fff';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grain (near-neutral for each respective blend mode)
+    const id = ctx.createImageData(w, h);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = isHighlight
+        ? Math.floor(Math.random() * 22)
+        : Math.floor(233 + Math.random() * 22);
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = Math.floor(Math.random() * 25 + 5);
     }
+    ctx.putImageData(id, 0, 0);
+
+    // Per-section diffraction: hl draws lit side, sh draws shadow side
+    sectionData.forEach((row, ri) => row.forEach(({ angle, intensity }, ci) => {
+      const x1 = vBounds[ci], y1 = hBounds[ri];
+      const x2 = vBounds[ci + 1], y2 = hBounds[ri + 1];
+      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+      const r = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.5;
+      const dx = Math.cos(angle) * r, dy = Math.sin(angle) * r;
+      const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
+      if (isHighlight) {
+        grad.addColorStop(0, `rgba(255,255,255,${intensity})`);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+      } else {
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(1, `rgba(0,0,0,${intensity})`);
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+    }));
+
+    // Fold crease lines
+    hPos.forEach((pos, i) => drawCreasePart(ctx, pos, true,  w, h, 1,   isHighlight, hAngles[i]));
+    vPos.forEach((pos, i) => drawCreasePart(ctx, pos, false, w, h, 2.2, isHighlight, vAngles[i]));
+
+    return canvas.toDataURL('image/png');
   }
 
-  const jitter = () => (Math.random() - 0.5) * 6;
-  pattern.h.forEach(t => drawCrease(ctx, h * t + jitter(), true,  w, h, 1));
-  pattern.v.forEach(t => drawCrease(ctx, w * t + jitter(), false, w, h, 2.2));
-
-  return canvas.toDataURL('image/png');
+  return { hl: buildCanvas(true), sh: buildCanvas(false) };
 }
 
 function addTilt(card) {
@@ -143,12 +161,19 @@ function render(list) {
     img.src = movie.poster;
     img.alt = movie.title;
 
-    const texture = document.createElement('div');
-    texture.className = 'poster-texture';
-    texture.style.backgroundImage = `url(${generateFoldTexture()})`;
+    const textures = generateFoldTextures();
+
+    const hlDiv = document.createElement('div');
+    hlDiv.className = 'poster-texture poster-texture-hl';
+    hlDiv.style.backgroundImage = `url(${textures.hl})`;
+
+    const shDiv = document.createElement('div');
+    shDiv.className = 'poster-texture poster-texture-sh';
+    shDiv.style.backgroundImage = `url(${textures.sh})`;
 
     imgWrap.appendChild(img);
-    imgWrap.appendChild(texture);
+    imgWrap.appendChild(hlDiv);
+    imgWrap.appendChild(shDiv);
 
     const info = document.createElement('div');
     info.className = 'card-info';

@@ -88,9 +88,16 @@ main {
   inset: 0;
   pointer-events: none;
   background-size: 100% 100%;
-  mix-blend-mode: soft-light;
   opacity: 0.45;
   transition: opacity 0.4s ease;
+}
+
+.poster-texture-hl {
+  mix-blend-mode: screen;
+}
+
+.poster-texture-sh {
+  mix-blend-mode: multiply;
 }
 
 .grain-control {
