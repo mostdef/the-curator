@@ -1,0 +1,3 @@
+{
+  "devCommand": "browser-sync start --server --port $PORT --files '*.html, *.css, *.js' --no-open --no-notify"
+}

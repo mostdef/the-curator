@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Braintrust — Settings</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;900&family=Oswald:wght@700&family=Playfair+Display:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Braintrust</h1>
+    <nav>
+      <a href="index.html" class="nav-link">People</a>
+      <a href="movies.html" class="nav-link">Movies</a>
+      <a href="settings.html" class="nav-link active">Settings</a>
+    </nav>
+  </header>
+
+  <main class="settings-main">
+    <h2 class="settings-title">Settings</h2>
+
+    <section class="settings-section">
+      <h3 class="settings-section-title">Snapshots</h3>
+      <p class="settings-section-desc">Snapshots capture all your lists at a point in time. Upload a snapshot file to restore your data.</p>
+
+      <div class="snapshot-upload" id="snapshot-upload">
+        <input type="file" id="snapshot-file" accept=".json" hidden />
+        <div class="snapshot-drop-zone" id="snapshot-drop-zone">
+          <span class="snapshot-drop-icon">📂</span>
+          <span class="snapshot-drop-label">Drop a snapshot file here or <button class="snapshot-browse-btn" id="snapshot-browse-btn">browse</button></span>
+          <span class="snapshot-drop-hint">.json files only</span>
+        </div>
+      </div>
+
+      <div class="snapshot-preview" id="snapshot-preview" hidden></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:40px">
+        <div class="settings-section-title" style="margin-top:0">Saved snapshots</div>
+        <button class="snap-restore-btn" id="save-snapshot-btn">Save snapshot now</button>
+      </div>
+      <div class="snapshot-list" id="snapshot-list">
+        <span class="snapshot-list-empty">Loading…</span>
+      </div>
+    </section>
+  </main>
+
+  <script src="settings-app.js"></script>
+</body>
+</html>
