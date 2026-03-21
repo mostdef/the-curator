@@ -7,15 +7,22 @@ const TMDB_IMG  = 'https://image.tmdb.org/t/p/';
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { movies = [], excluded = [] } = req.body;
+  const { movies = [], excluded = [], standards = [] } = req.body;
 
   const movieList = movies.length
     ? movies.map(m => `"${m.title}" (${m.year}, ${m.director})`).join(', ')
     : 'empty — recommend a widely acclaimed film';
 
+  const standardsList = standards.length
+    ? standards.map(m => `"${m.title}" (${m.year}, ${m.director})`).join(', ')
+    : null;
+
   const prompt = [
     `You are a film recommendation engine. Analyze this curated movie collection and recommend exactly one film the curator is missing.`,
-    `Collection: ${movieList}`,
+    standardsList
+      ? `REFERENCE FILMS — these are the curator's all-time favourites and define their taste most precisely. Weight these heavily above all else: ${standardsList}`
+      : '',
+    `Full collection: ${movieList}`,
     excluded.length ? `Do not suggest any of these (already in list, rejected, or already shown): ${excluded.join(', ')}` : '',
     `Choose a film that fits the collection's taste, directors, themes, or era. Write a reason (1–2 sentences) that directly references specific films or directors already in the collection.`,
   ].filter(Boolean).join('\n');

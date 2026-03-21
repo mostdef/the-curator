@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Braintrust — TV Series</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;900&family=Oswald:wght@700&family=Playfair+Display:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Braintrust</h1>
+    <nav>
+      <a href="index.html" class="nav-link">People</a>
+      <a href="movies.html" class="nav-link">Movies</a>
+      <a href="tv-series.html" class="nav-link active">TV Series</a>
+      <a href="books.html" class="nav-link">Books</a>
+      <a href="settings.html" class="nav-link">Settings</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="recommendation" id="recommendation"></div>
+    <div class="grid-nav" id="grid-nav"></div>
+    <div id="standards-wrap"></div>
+    <div id="persona-wrap"></div>
+    <div class="grid" id="grid-collection"></div>
+    <div class="grid" id="grid-watchlist" style="display:none"></div>
+    <div class="grid" id="grid-maybe"     style="display:none"></div>
+    <div class="grid" id="grid-meh"       style="display:none"></div>
+    <div class="grid" id="grid-banned"    style="display:none"></div>
+  </main>
+
+  <div class="grain-control">
+    <button class="texture-toggle" id="texture-toggle">Grain</button>
+    <input type="range" id="grain-slider" class="grain-slider" min="0" max="1" step="0.01" value="0.04" hidden>
+    <span class="grain-value" id="grain-value" hidden>4%</span>
+    <input type="range" id="dark-slider" class="grain-slider" min="0" max="100" step="1" value="100" hidden>
+    <span class="grain-value" id="dark-value" hidden>+100%</span>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script src="tv-series-data.js"></script>
+  <script src="tv-series-app.js"></script>
+</body>
+</html>

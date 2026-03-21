@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Braintrust — Books</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;900&family=Oswald:wght@700&family=Playfair+Display:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ── Onboarding Wizard ───────────────────────────────────────────── */
+    #onboarding-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: linear-gradient(160deg, #0c0c0c 0%, #111 100%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .ob-top-bar {
+      position: absolute;
+      top: 24px;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+    }
+
+    .ob-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 19px;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 800;
+    }
+
+    .ob-done-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: rgba(255, 255, 255, 0.45);
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .ob-done-btn:hover {
+      border-color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .ob-header {
+      text-align: center;
+      margin-bottom: 36px;
+      pointer-events: none;
+    }
+
+    .ob-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(20px, 4vw, 30px);
+      color: #fff;
+      margin: 0 0 8px;
+      font-weight: 800;
+    }
+
+    .ob-subtitle {
+      color: rgba(255, 255, 255, 0.32);
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* ── Card Stack ── */
+    .ob-stage {
+      position: relative;
+      width: min(250px, 72vw);
+      height: min(380px, 62vh);
+      margin-bottom: 32px;
+      flex-shrink: 0;
+    }
+
+    .ob-card {
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: #1c1c1e;
+      overflow: hidden;
+      will-change: transform;
+      transform-origin: center 85%;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .ob-card:active {
+      cursor: grabbing;
+    }
+
+    .ob-card-behind {
+      transform: scale(0.92) translateY(14px);
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .ob-cover-wrap {
+      width: 100%;
+      height: calc(100% - 64px);
+      overflow: hidden;
+      background: #1a1a20;
+    }
+
+    .ob-cover {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    .ob-book-info {
+      padding: 10px 14px 12px;
+      height: 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .ob-book-title {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .ob-book-meta {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.32);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Stamps ── */
+    .ob-stamp {
+      position: absolute;
+      top: 20px;
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 1.5px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+      border-width: 2px;
+      border-style: solid;
+    }
+
+    .ob-stamp-read {
+      left: 14px;
+      color: #3dc864;
+      border-color: #3dc864;
+      background: rgba(61, 200, 100, 0.1);
+      transform: rotate(-12deg);
+    }
+
+    .ob-stamp-skip {
+      right: 14px;
+      color: #ff5050;
+      border-color: #ff5050;
+      background: rgba(255, 80, 80, 0.1);
+      transform: rotate(12deg);
+    }
+
+    /* ── Footer ── */
+    .ob-footer {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .ob-action-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid;
+      background: transparent;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s cubic-bezier(0.23, 1, 0.32, 1), background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .ob-action-btn:hover { transform: scale(1.12); }
+    .ob-action-btn:active { transform: scale(0.92); }
+
+    .ob-btn-skip {
+      border-color: rgba(255, 80, 80, 0.45);
+      color: rgba(255, 80, 80, 0.8);
+    }
+
+    .ob-btn-skip:hover { background: rgba(255, 80, 80, 0.07); }
+
+    .ob-btn-add {
+      border-color: rgba(61, 200, 100, 0.45);
+      color: rgba(61, 200, 100, 0.85);
+    }
+
+    .ob-btn-add:hover { background: rgba(61, 200, 100, 0.07); }
+
+    .ob-progress-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      min-width: 56px;
+    }
+
+    .ob-progress {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.28);
+    }
+
+    .ob-count-badge {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      color: rgba(61, 200, 100, 0.65);
+      min-height: 14px;
+    }
+
+    /* ── Hint arrows ── */
+    .ob-swipe-hints {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 12px;
+    }
+
+    .ob-hint-arrow {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.08);
+      transition: color 0.2s;
+    }
+
+    /* ── Finish screen ── */
+    .ob-finish-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      animation: obFadeUp 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+      padding: 24px;
+    }
+
+    .ob-finish-screen.visible { display: flex; }
+
+    .ob-finish-icon {
+      font-size: 56px;
+      margin-bottom: 20px;
+      line-height: 1;
+    }
+
+    .ob-finish-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      color: #fff;
+      font-weight: 800;
+      margin: 0 0 10px;
+    }
+
+    .ob-finish-sub {
+      color: rgba(255, 255, 255, 0.38);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      margin-bottom: 36px;
+      max-width: 320px;
+      line-height: 1.6;
+    }
+
+    .ob-finish-btn {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+      padding: 14px 36px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .ob-finish-btn:hover {
+      background: rgba(255, 255, 255, 0.13);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    @keyframes obFadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .ob-wizard-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Braintrust</h1>
+    <nav>
+      <a href="index.html" class="nav-link">People</a>
+      <a href="movies.html" class="nav-link">Movies</a>
+      <a href="tv-series.html" class="nav-link">TV Series</a>
+      <a href="books.html" class="nav-link active">Books</a>
+      <a href="settings.html" class="nav-link">Settings</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="recommendation" id="recommendation"></div>
+    <div class="grid-nav" id="grid-nav"></div>
+    <div id="standards-wrap"></div>
+    <div id="persona-wrap"></div>
+    <div class="grid" id="grid-collection"></div>
+    <div class="grid" id="grid-watchlist" style="display:none"></div>
+    <div class="grid" id="grid-maybe"     style="display:none"></div>
+    <div class="grid" id="grid-meh"       style="display:none"></div>
+    <div class="grid" id="grid-banned"    style="display:none"></div>
+  </main>
+
+  <div class="grain-control">
+    <button class="texture-toggle" id="texture-toggle">Grain</button>
+    <input type="range" id="grain-slider" class="grain-slider" min="0" max="1" step="0.01" value="0.04" hidden>
+    <span class="grain-value" id="grain-value" hidden>4%</span>
+    <input type="range" id="dark-slider" class="grain-slider" min="0" max="100" step="1" value="100" hidden>
+    <span class="grain-value" id="dark-value" hidden>+100%</span>
+  </div>
+
+  <!-- ── Onboarding Wizard Overlay ── -->
+  <div id="onboarding-overlay">
+    <div class="ob-top-bar">
+      <span class="ob-logo">Braintrust</span>
+      <button class="ob-done-btn" id="ob-done-btn">Finish setup</button>
+    </div>
+
+    <!-- Wizard body (cards + footer) -->
+    <div class="ob-wizard-body" id="ob-wizard-body">
+      <div class="ob-header">
+        <div class="ob-title">Which of these have you read?</div>
+        <div class="ob-subtitle">Swipe right to add · left to skip</div>
+      </div>
+
+      <div class="ob-stage" id="ob-stage">
+        <div class="ob-swipe-hints">
+          <span class="ob-hint-arrow">←</span>
+          <span class="ob-hint-arrow">→</span>
+        </div>
+      </div>
+
+      <div class="ob-footer">
+        <button class="ob-action-btn ob-btn-skip" id="ob-btn-skip" title="Skip (←)">✕</button>
+        <div class="ob-progress-wrap">
+          <span class="ob-progress" id="ob-progress">1 / 30</span>
+          <span class="ob-count-badge" id="ob-count-badge"></span>
+        </div>
+        <button class="ob-action-btn ob-btn-add" id="ob-btn-add" title="Add to collection (→)">✓</button>
+      </div>
+    </div>
+
+    <!-- Finish screen (shown after all cards swiped) -->
+    <div class="ob-finish-screen" id="ob-finish-screen">
+      <div class="ob-finish-icon">📚</div>
+      <div class="ob-finish-title" id="ob-finish-title">Your library is ready</div>
+      <div class="ob-finish-sub" id="ob-finish-sub">You've added books to your collection. Discover more with AI recommendations.</div>
+      <button class="ob-finish-btn" id="ob-finish-btn">Enter your library</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script src="books-data.js"></script>
+  <script src="books-app.js"></script>
+</body>
+</html>

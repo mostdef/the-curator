@@ -4,8 +4,9 @@ function getGrid(v) { return document.getElementById('grid-' + v); }
 function markDirty(v) { dirtyViews.add(v); }
 function markClean(v) { dirtyViews.delete(v); }
 
-let draggedCard  = null;
-let droppedOnTab = false;
+let draggedCard          = null;
+let droppedOnTab         = false;
+let pendingStandardsSlot = null;
 
 function getViewList(view)       { return view === 'collection' ? movies : ({ watchlist: loadWatchlist, maybe: loadMaybe, meh: loadMeh, banned: loadBanned }[view])(); }
 function saveViewList(view, list){ if (view === 'collection') { movies.splice(0, movies.length, ...list); saveMovies(); } else ({ watchlist: saveWatchlist, maybe: saveMaybe, meh: saveMeh, banned: saveBanned }[view])(list); }
@@ -192,12 +193,362 @@ function getCachedTextures(key) {
   return textureCache.get(key);
 }
 
+function renderStandardsSection() {
+  const wrap = document.getElementById('standards-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  const standards = loadStandards();
+
+  const header = document.createElement('div');
+  header.className = 'standards-header';
+  const title = document.createElement('span');
+  title.className = 'standards-title';
+  title.textContent = 'Reference Films';
+  const count = document.createElement('span');
+  count.className = 'standards-count';
+  count.textContent = `${standards.length} / ${MAX_STANDARDS}`;
+  header.appendChild(title);
+  header.appendChild(count);
+  wrap.appendChild(header);
+
+  const slots = document.createElement('div');
+  slots.className = 'standards-slots';
+
+  for (let i = 0; i < MAX_STANDARDS; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'standards-slot';
+    const movie = standards[i];
+
+    if (movie) {
+      slot.classList.add('filled');
+      const img = document.createElement('img');
+      img.src = movie.poster;
+      img.alt = movie.title;
+      img.title = `${movie.title} (${movie.year})`;
+      img.draggable = false;
+      slot.appendChild(img);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'standards-slot-remove';
+      removeBtn.innerHTML = '✕';
+      removeBtn.addEventListener('click', () => {
+        const updated = loadStandards().filter(m => m.title !== movie.title);
+        saveStandards(updated);
+        render(sortedList(movies, 'collection'));
+        applyGrain();
+      });
+      slot.appendChild(removeBtn);
+    } else {
+      slot.classList.add('empty');
+      slot.innerHTML = '<span class="standards-slot-plus" style="pointer-events:none">★</span>';
+    }
+
+    slots.appendChild(slot);
+  }
+
+  wrap.appendChild(slots);
+
+  // Track which slot is hovered during drag — actual save happens in SortableJS onEnd
+  wrap.addEventListener('dragover', (e) => {
+    if (!draggedCard) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const slot = e.target.closest('.standards-slot.empty');
+    wrap.querySelectorAll('.standards-slot').forEach(s => s.classList.remove('drop-hover'));
+    if (slot) {
+      slot.classList.add('drop-hover');
+      pendingStandardsSlot = slot;
+    } else {
+      pendingStandardsSlot = null;
+    }
+  });
+
+  wrap.addEventListener('dragleave', (e) => {
+    if (!wrap.contains(e.relatedTarget)) {
+      wrap.querySelectorAll('.standards-slot').forEach(s => s.classList.remove('drop-hover'));
+      // Do NOT clear pendingStandardsSlot here — dragleave fires before onEnd
+      // and would erase the tracked slot before we can save it.
+    }
+  });
+}
+
+// ── Cinema Persona ───────────────────────────────────────────────────────────
+
+const PERSONA_CACHE_KEY       = 'braintrust_persona_cache_v4';
+const PERSONA_STATS_CACHE_KEY = 'braintrust_persona_stats_v2';
+let personaIndex          = 0;
+let personaBlobUrls       = [];
+let personaRenderedForKey = null;
+
+function getPersonaCacheKey(stds) {
+  return stds.map(m => m.title).sort().join('|');
+}
+
+function getCollectionKey() {
+  // Simple hash of the full collection for stats cache invalidation
+  const str = movies.map(m => m.title).sort().join('|');
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(31, h) + str.charCodeAt(i) | 0; }
+  return (h >>> 0).toString(36) + '_' + movies.length;
+}
+
+function loadPersonaCache() {
+  try { return JSON.parse(localStorage.getItem(PERSONA_CACHE_KEY)) || null; } catch { return null; }
+}
+
+function savePersonaCache(key, data) {
+  localStorage.setItem(PERSONA_CACHE_KEY, JSON.stringify({ key, data }));
+}
+
+function fetchPersonaImage(personas, idx) {
+  if (personaBlobUrls[idx]) return; // already loaded or loading
+  personaBlobUrls[idx] = 'loading';
+  fetch('/api/persona-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: personas[idx].imagePrompt }),
+  })
+    .then(r => r.ok ? r.blob() : Promise.reject(r.status))
+    .then(blob => {
+      personaBlobUrls[idx] = URL.createObjectURL(blob);
+      if (personaIndex === idx) applyPersonaImage();
+    })
+    .catch(err => { personaBlobUrls[idx] = null; console.warn('Persona image failed:', err); });
+}
+
+function applyPersonaImage() {
+  const img = document.querySelector('.persona-room-img');
+  if (!img) return;
+  const url = personaBlobUrls[personaIndex];
+  if (url && url !== 'loading') {
+    img.classList.remove('loaded');
+    img.src = url;
+    img.onload = () => img.classList.add('loaded');
+  }
+}
+
+function applyPersonaText(personas) {
+  const p = personas[personaIndex];
+  const overlay = document.querySelector('.persona-overlay');
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  setTimeout(() => {
+    overlay.querySelector('.persona-type').textContent        = p.type;
+    overlay.querySelector('.persona-tagline').textContent    = `"${p.tagline}"`;
+    overlay.querySelector('.persona-description').textContent = p.description;
+    overlay.querySelector('.persona-label').textContent      = `Your Cinema Persona  ${personaIndex + 1} / ${personas.length}`;
+    overlay.querySelectorAll('.persona-dot').forEach((d, i) => d.classList.toggle('active', i === personaIndex));
+    overlay.style.opacity = '1';
+    applyPersonaImage();
+  }, 180);
+}
+
+function renderPersonaCard(wrap, personas) {
+  personaBlobUrls = [];
+  wrap.innerHTML = '';
+
+  const p = personas[personaIndex];
+  const card = document.createElement('div');
+  card.className = 'persona-card';
+
+  const imgWrap = document.createElement('div');
+  imgWrap.className = 'persona-room-wrap';
+
+  const img = document.createElement('img');
+  img.className = 'persona-room-img';
+  img.alt = '';
+  img.draggable = false;
+
+  // Nav arrows
+  const btnPrev = document.createElement('button');
+  btnPrev.className = 'persona-nav persona-nav-prev';
+  btnPrev.innerHTML = '&#8592;';
+  btnPrev.addEventListener('click', () => {
+    personaIndex = (personaIndex - 1 + personas.length) % personas.length;
+    applyPersonaText(personas);
+    fetchPersonaImage(personas, personaIndex);
+  });
+
+  const btnNext = document.createElement('button');
+  btnNext.className = 'persona-nav persona-nav-next';
+  btnNext.innerHTML = '&#8594;';
+  btnNext.addEventListener('click', () => {
+    personaIndex = (personaIndex + 1) % personas.length;
+    applyPersonaText(personas);
+    fetchPersonaImage(personas, personaIndex);
+  });
+
+  const overlay = document.createElement('div');
+  overlay.className = 'persona-overlay';
+  overlay.style.transition = 'opacity 0.18s';
+
+  const label = document.createElement('div');
+  label.className = 'persona-label';
+  label.textContent = `Your Cinema Persona  1 / ${personas.length}`;
+
+  const type = document.createElement('div');
+  type.className = 'persona-type';
+  type.textContent = p.type;
+
+  const tagline = document.createElement('div');
+  tagline.className = 'persona-tagline';
+  tagline.textContent = `"${p.tagline}"`;
+
+  const desc = document.createElement('div');
+  desc.className = 'persona-description';
+  desc.textContent = p.description;
+
+  // Dots
+  const dots = document.createElement('div');
+  dots.className = 'persona-dots';
+  personas.forEach((_, i) => {
+    const d = document.createElement('span');
+    d.className = 'persona-dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => {
+      personaIndex = i;
+      applyPersonaText(personas);
+      fetchPersonaImage(personas, personaIndex);
+    });
+    dots.appendChild(d);
+  });
+
+  overlay.append(label, type, tagline, desc, dots);
+  imgWrap.append(img, btnPrev, btnNext, overlay);
+  card.appendChild(imgWrap);
+  wrap.appendChild(card);
+
+  // Fetch all 4 images in parallel
+  personas.forEach((_, i) => fetchPersonaImage(personas, i));
+
+  // Stats panel
+  const statsBar = document.createElement('div');
+  statsBar.className = 'persona-stats-bar persona-stats-loading';
+  statsBar.innerHTML = Array(4).fill('<div class="persona-stat-skel"></div>').join('');
+  card.appendChild(statsBar);
+
+  const statsKey = getCollectionKey();
+  let statsCache;
+  try { statsCache = JSON.parse(localStorage.getItem(PERSONA_STATS_CACHE_KEY)); } catch {}
+
+  if (statsCache && statsCache.key === statsKey) {
+    renderStatsBar(statsBar, statsCache.data);
+  } else {
+    const films = movies.map(m => ({ title: m.title, year: m.year, director: m.director }));
+    fetch('/api/persona-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ films }),
+    })
+      .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(`${r.status}: ${t}`))))
+      .then(data => {
+        localStorage.setItem(PERSONA_STATS_CACHE_KEY, JSON.stringify({ key: statsKey, data }));
+        renderStatsBar(statsBar, data);
+      })
+      .catch(err => {
+        console.error('persona-stats error:', err);
+        statsBar.classList.remove('persona-stats-loading');
+        statsBar.innerHTML = '';
+      });
+  }
+}
+
+function renderStatsBar(bar, data) {
+  const stats = [];
+
+  if (data.topDirector) stats.push({ icon: '🎬', label: data.topDirector.name, sub: `${data.topDirector.films} films` });
+  if (data.topActors?.length) data.topActors.slice(0, 2).forEach(a => stats.push({ icon: '🎭', label: a.name, sub: `${a.films} films` }));
+  if (data.topDP)       stats.push({ icon: '📷', label: data.topDP.name, sub: `DP · ${data.topDP.films} films` });
+  if (data.topComposer) stats.push({ icon: '🎼', label: data.topComposer.name, sub: `Score · ${data.topComposer.films} films` });
+  if (data.topDecade)   stats.push({ icon: '📅', label: `${String(data.topDecade).slice(2)}s`, sub: 'top decade' });
+  if (data.yearRange && data.span > 0) stats.push({ icon: '⏳', label: `${data.yearRange.from}–${data.yearRange.to}`, sub: `${data.span} year span` });
+
+  bar.classList.remove('persona-stats-loading');
+  if (!stats.length) { bar.innerHTML = `<div class="persona-stat-chip"><span class="persona-stat-icon">🎬</span><span class="persona-stat-label">Collection stats</span><span class="persona-stat-sub">${data.totalFilms} films</span></div>`; return; }
+
+  bar.innerHTML = '';
+  stats.forEach(({ icon, label, sub }) => {
+    const chip = document.createElement('div');
+    chip.className = 'persona-stat-chip';
+    chip.innerHTML = `<span class="persona-stat-icon">${icon}</span><span class="persona-stat-label">${label}</span><span class="persona-stat-sub">${sub}</span>`;
+    bar.appendChild(chip);
+  });
+}
+
+function renderPersonaSection() {
+  const wrap = document.getElementById('persona-wrap');
+  if (!wrap) return;
+
+  const standards = loadStandards();
+  if (standards.length === 0) {
+    if (personaRenderedForKey !== null) { wrap.innerHTML = ''; personaRenderedForKey = null; }
+    return;
+  }
+
+  // Invalidate stats cache if collection changed
+  try {
+    const sc = JSON.parse(localStorage.getItem(PERSONA_STATS_CACHE_KEY));
+    if (sc && sc.key !== getCollectionKey()) localStorage.removeItem(PERSONA_STATS_CACHE_KEY);
+  } catch {}
+
+  const cacheKey = getPersonaCacheKey(standards);
+
+  // Don't re-render if already showing this exact set of reference films
+  if (cacheKey === personaRenderedForKey) return;
+
+  personaIndex = 0;
+  personaRenderedForKey = cacheKey;
+
+  const cache = loadPersonaCache();
+  if (cache && cache.key === cacheKey) { renderPersonaCard(wrap, cache.data.personas); return; }
+
+  // Loading skeleton
+  wrap.innerHTML = `
+    <div class="persona-card persona-loading">
+      <div class="persona-room-wrap">
+        <div class="persona-room-shimmer"></div>
+        <div class="persona-overlay">
+          <div class="persona-skel" style="width:120px;height:11px"></div>
+          <div class="persona-skel" style="width:260px;height:28px;margin-top:8px"></div>
+          <div class="persona-skel" style="width:340px;height:14px;margin-top:10px"></div>
+          <div class="persona-skel" style="width:300px;height:14px;margin-top:6px"></div>
+        </div>
+      </div>
+    </div>`;
+
+  fetch('/api/persona', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ standards }),
+  })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => { savePersonaCache(cacheKey, data); renderPersonaCard(wrap, data.personas); })
+    .catch(() => { wrap.innerHTML = ''; });
+}
+
+function toggleStandard(movie) {
+  const stds = loadStandards();
+  const idx = stds.findIndex(m => m.title === movie.title);
+  if (idx !== -1) {
+    stds.splice(idx, 1);
+  } else {
+    if (stds.length >= MAX_STANDARDS) return false;
+    stds.push({ title: movie.title, year: movie.year, director: movie.director, poster: movie.poster });
+  }
+  saveStandards(stds);
+  return true;
+}
+
 function render(list) {
+  renderStandardsSection();
+  renderPersonaSection();
   const g = getGrid('collection');
   g.innerHTML = '';
+  const standards = loadStandards();
   list.forEach(movie => {
     const card = document.createElement('div');
-    card.className = 'card movie-card';
+    const isStandard = standards.some(m => m.title === movie.title);
+    card.className = 'card movie-card' + (isStandard ? ' is-standard' : '');
 
     const imgWrap = document.createElement('div');
     imgWrap.className = 'poster-wrap';
@@ -217,9 +568,20 @@ function render(list) {
     shDiv.className = 'poster-texture poster-texture-sh';
     shDiv.style.backgroundImage = `url(${textures.sh})`;
 
+    const starBtn = document.createElement('button');
+    starBtn.className = 'card-star-btn' + (isStandard ? ' active' : '');
+    starBtn.title = isStandard ? 'Remove from Reference Films' : 'Add to Reference Films';
+    starBtn.innerHTML = '★';
+    starBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ok = toggleStandard(movie);
+      if (ok !== false) { render(sortedList(movies, 'collection')); applyGrain(); }
+    });
+
     imgWrap.appendChild(img);
     imgWrap.appendChild(hlDiv);
     imgWrap.appendChild(shDiv);
+    imgWrap.appendChild(starBtn);
 
     const info = document.createElement('div');
     info.className = 'card-info';
@@ -266,7 +628,7 @@ async function fetchRecommendation() {
     const res = await fetch('/api/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movies, excluded }),
+      body: JSON.stringify({ movies, excluded, standards: loadStandards() }),
     });
 
     if (!res.ok) {
@@ -315,17 +677,35 @@ function renderRecommendation() {
     loadingBanner.className = 'rec-banner rec-banner-loading';
     loadingBanner.innerHTML = `
       <div class="rec-skel-content">
-        <div class="rec-skel-poster"></div>
-        <div class="rec-skel-info">
-          <div class="rec-skel-bar" style="width:72%;height:48px;border-radius:6px"></div>
-          <div class="rec-skel-bar" style="width:38%;height:14px;margin-top:12px"></div>
-          <div class="rec-skel-bar" style="width:100%;height:12px;margin-top:20px"></div>
-          <div class="rec-skel-bar" style="width:95%;height:12px;margin-top:8px"></div>
-          <div class="rec-skel-bar" style="width:80%;height:12px;margin-top:8px"></div>
-          <div style="display:flex;gap:10px;margin-top:28px">
-            <div class="rec-skel-bar" style="width:120px;height:38px;border-radius:8px"></div>
-            <div class="rec-skel-bar" style="width:120px;height:38px;border-radius:8px"></div>
+        <div class="rec-poster-col">
+          <div class="rec-skel-poster"></div>
+          <div class="rec-poster-buttons">
+            <div class="rec-skel-bar" style="height:36px;border-radius:8px"></div>
+            <div class="rec-skel-bar" style="height:36px;border-radius:8px;margin-top:6px"></div>
           </div>
+        </div>
+        <div class="rec-skel-info">
+          <div class="rec-skel-bar" style="width:62%;height:52px;border-radius:6px"></div>
+          <div class="rec-skel-bar" style="width:30%;height:13px;margin-top:12px"></div>
+          <div class="rec-skel-bar" style="width:100%;height:12px;margin-top:20px"></div>
+          <div class="rec-skel-bar" style="width:97%;height:12px;margin-top:7px"></div>
+          <div class="rec-skel-bar" style="width:90%;height:12px;margin-top:7px"></div>
+          <div class="rec-skel-bar" style="width:74%;height:12px;margin-top:7px"></div>
+          <div class="rec-skel-bar" style="width:40%;height:10px;margin-top:18px"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <div class="rec-skel-bar" style="width:68px;height:24px;border-radius:6px"></div>
+            <div class="rec-skel-bar" style="width:52px;height:24px;border-radius:6px"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:auto;padding-top:24px">
+            <div class="rec-skel-bar" style="width:138px;height:36px;border-radius:8px"></div>
+            <div class="rec-skel-bar" style="width:96px;height:36px;border-radius:8px"></div>
+            <div class="rec-skel-bar" style="width:68px;height:36px;border-radius:8px"></div>
+            <div class="rec-skel-bar" style="width:132px;height:36px;border-radius:8px"></div>
+          </div>
+        </div>
+        <div class="rec-skel-stills">
+          <div class="rec-skel-bar" style="width:360px;height:100%;border-radius:0;flex-shrink:0"></div>
+          <div class="rec-skel-bar" style="width:360px;height:100%;border-radius:0;flex-shrink:0"></div>
         </div>
       </div>`;
     wrap.appendChild(loadingBanner);
@@ -590,7 +970,12 @@ const WATCHLIST_KEY  = 'braintrust_watchlist';
 const MAYBE_KEY      = 'braintrust_maybe';
 const MEH_KEY        = 'braintrust_meh';
 const SNAPSHOTS_KEY  = 'braintrust_snapshots';
+const STANDARDS_KEY  = 'braintrust_standards';
 const MAX_SNAPSHOTS  = 20;
+const MAX_STANDARDS  = 12;
+
+function loadStandards() { try { return JSON.parse(localStorage.getItem(STANDARDS_KEY) || '[]'); } catch(e) { return []; } }
+function saveStandards(list) { localStorage.setItem(STANDARDS_KEY, JSON.stringify(list)); }
 
 function saveSnapshot(label = '') {
   const snap = {
@@ -601,6 +986,7 @@ function saveSnapshot(label = '') {
     maybe:     JSON.parse(localStorage.getItem(MAYBE_KEY)     || '[]'),
     meh:       JSON.parse(localStorage.getItem(MEH_KEY)       || '[]'),
     banned:    JSON.parse(localStorage.getItem(BANNED_KEY)    || '[]'),
+    standards: JSON.parse(localStorage.getItem(STANDARDS_KEY) || '[]'),
   };
   const snapshots = loadSnapshots();
   snapshots.unshift(snap);
@@ -623,6 +1009,7 @@ function restoreSnapshot(snap) {
   localStorage.setItem(MAYBE_KEY,     JSON.stringify(snap.maybe));
   localStorage.setItem(MEH_KEY,       JSON.stringify(snap.meh || []));
   localStorage.setItem(BANNED_KEY,    JSON.stringify(snap.banned));
+  if (snap.standards) localStorage.setItem(STANDARDS_KEY, JSON.stringify(snap.standards));
   movies.splice(0, movies.length, ...snap.movies);
   VIEWS.forEach(v => markDirty(v));
   setGridView(gridView);
@@ -735,14 +1122,39 @@ function updateSortable(view) {
     ghostClass: 'sortable-ghost',
     disabled: locked,
     onStart: (evt) => {
-      draggedCard  = evt.item;
-      droppedOnTab = false;
+      draggedCard          = evt.item;
+      droppedOnTab         = false;
+      pendingStandardsSlot = null;
       document.querySelectorAll('.grid-nav-btn').forEach(btn => {
         if (btn.dataset.key !== gridView) btn.classList.add('drop-target');
       });
+      if (gridView === 'collection') document.getElementById('standards-wrap')?.classList.add('drag-active');
     },
     onEnd: () => {
       document.querySelectorAll('.grid-nav-btn').forEach(btn => btn.classList.remove('drop-target', 'drop-hover'));
+      document.getElementById('standards-wrap')?.classList.remove('drag-active');
+      document.getElementById('standards-wrap')?.querySelectorAll('.standards-slot').forEach(s => s.classList.remove('drop-hover'));
+
+      // Drop onto a standards slot
+      if (pendingStandardsSlot && draggedCard) {
+        const title = draggedCard.querySelector('.card-name').textContent;
+        const film  = movies.find(m => m.title === title);
+        if (film) {
+          const stds = loadStandards();
+          if (!stds.some(m => m.title === title) && stds.length < MAX_STANDARDS) {
+            stds.push({ title: film.title, year: film.year, director: film.director, poster: film.poster });
+            saveStandards(stds);
+            markDirty('collection');
+          }
+        }
+        pendingStandardsSlot = null;
+        draggedCard  = null;
+        droppedOnTab = false;
+        setGridView(gridView);
+        renderGridNav();
+        return;
+      }
+
       if (droppedOnTab) {
         droppedOnTab = false;
         draggedCard  = null;
@@ -798,6 +1210,10 @@ function updateSortable(view) {
 function setGridView(view) {
   gridView = view;
   VIEWS.forEach(v => { getGrid(v).style.display = v === view ? '' : 'none'; });
+  const sw = document.getElementById('standards-wrap');
+  if (sw) sw.style.display = view === 'collection' ? '' : 'none';
+  const pw = document.getElementById('persona-wrap');
+  if (pw) pw.style.display = view === 'collection' ? '' : 'none';
   if (dirtyViews.has(view)) {
     if (view === 'collection') { render(sortedList(movies, 'collection')); applyGrain(); }
     else if (view === 'watchlist') renderWatchlistGrid();
@@ -925,21 +1341,7 @@ function buildNavButtons(container, compact = false) {
 function renderGridNav() {
   const nav = document.getElementById('grid-nav');
   if (nav) buildNavButtons(nav);
-  const headerNav = document.getElementById('header-grid-nav');
-  if (headerNav) buildNavButtons(headerNav, true);
 }
-
-// Show header nav when grid nav scrolls out of view
-window.addEventListener('DOMContentLoaded', () => {
-  const gridNav = document.getElementById('grid-nav');
-  const headerNav = document.getElementById('header-grid-nav');
-  if (!gridNav || !headerNav) return;
-  const observer = new IntersectionObserver(
-    ([entry]) => headerNav.classList.toggle('visible', !entry.isIntersecting),
-    { threshold: 0, rootMargin: '0px 0px 0px 0px' }
-  );
-  observer.observe(gridNav);
-});
 
 function addTexturesToPoster(posterWrap, key) {
   const textures = getCachedTextures(key);
@@ -1282,5 +1684,178 @@ darkSlider.addEventListener('input', () => {
   darkBoost = parseInt(darkSlider.value);
   darkValue.textContent = '+' + darkBoost + '%';
   applyGrain();
+});
+
+// ── Movie Modal ───────────────────────────────────────────────────────────────
+
+const modalDetailsCache = new Map();
+
+function openMovieModal(movie) {
+  const backdrop = document.getElementById('movie-modal-backdrop');
+  const body     = document.getElementById('movie-modal-body');
+  backdrop.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Show loading state immediately with known data
+  body.innerHTML = `
+    <div class="mm-poster-col">
+      <img class="mm-poster" src="${movie.poster}" alt="${movie.title}">
+    </div>
+    <div class="mm-info">
+      <div class="mm-title">${movie.title}</div>
+      <div class="mm-meta">${movie.director} · ${movie.year}</div>
+      <div class="mm-loading-bar"></div>
+      <div class="mm-loading-bar" style="width:80%;margin-top:8px"></div>
+      <div class="mm-loading-bar" style="width:65%;margin-top:8px"></div>
+    </div>`;
+
+  const cacheKey = `${movie.title}__${movie.year}`;
+  if (modalDetailsCache.has(cacheKey)) {
+    renderModalDetails(body, movie, modalDetailsCache.get(cacheKey));
+    return;
+  }
+
+  fetch(`/api/movie-details?title=${encodeURIComponent(movie.title)}&year=${movie.year}`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => {
+      modalDetailsCache.set(cacheKey, data);
+      // Only update if modal is still open for this movie
+      if (backdrop.style.display !== 'none') renderModalDetails(body, movie, data);
+    })
+    .catch(() => {});
+}
+
+function renderModalDetails(body, movie, data) {
+  body.innerHTML = '';
+
+  const posterCol = document.createElement('div');
+  posterCol.className = 'mm-poster-col';
+  const poster = document.createElement('img');
+  poster.className = 'mm-poster';
+  poster.src = data.poster || movie.poster;
+  poster.alt = movie.title;
+  posterCol.appendChild(poster);
+
+  const info = document.createElement('div');
+  info.className = 'mm-info';
+
+  // Header
+  const title = document.createElement('div');
+  title.className = 'mm-title';
+  title.textContent = movie.title;
+
+  const meta = document.createElement('div');
+  meta.className = 'mm-meta';
+  const parts = [movie.director, movie.year];
+  if (data.runtime) parts.push(`${data.runtime} min`);
+  meta.textContent = parts.join(' · ');
+
+  info.append(title, meta);
+
+  if (data.genres?.length) {
+    const genres = document.createElement('div');
+    genres.className = 'mm-genres';
+    data.genres.forEach(g => {
+      const tag = document.createElement('span');
+      tag.className = 'mm-genre-tag';
+      tag.textContent = g;
+      genres.appendChild(tag);
+    });
+    info.appendChild(genres);
+  }
+
+  if (data.tagline) {
+    const tagline = document.createElement('div');
+    tagline.className = 'mm-tagline';
+    tagline.textContent = `"${data.tagline}"`;
+    info.appendChild(tagline);
+  }
+
+  if (data.overview) {
+    const overview = document.createElement('p');
+    overview.className = 'mm-overview';
+    overview.textContent = data.overview;
+    info.appendChild(overview);
+  }
+
+  // Cast
+  if (data.cast?.length) {
+    const castLabel = document.createElement('div');
+    castLabel.className = 'mm-section-label';
+    castLabel.textContent = 'Cast';
+    info.appendChild(castLabel);
+
+    const castRow = document.createElement('div');
+    castRow.className = 'mm-cast';
+    data.cast.forEach(person => {
+      const item = document.createElement('div');
+      item.className = 'mm-cast-item';
+      const photo = document.createElement('div');
+      photo.className = 'mm-cast-photo';
+      if (person.photo) {
+        const img = document.createElement('img');
+        img.src = person.photo;
+        img.alt = person.name;
+        photo.appendChild(img);
+      } else {
+        photo.classList.add('mm-cast-photo-blank');
+        photo.textContent = person.name[0];
+      }
+      const name = document.createElement('div');
+      name.className = 'mm-cast-name';
+      name.textContent = person.name;
+      const character = document.createElement('div');
+      character.className = 'mm-cast-character';
+      character.textContent = person.character;
+      item.append(photo, name, character);
+      castRow.appendChild(item);
+    });
+    info.appendChild(castRow);
+  }
+
+  // Key crew
+  if (data.keyCrew?.length) {
+    const crewLabel = document.createElement('div');
+    crewLabel.className = 'mm-section-label';
+    crewLabel.textContent = 'Key Crew';
+    info.appendChild(crewLabel);
+
+    const crewGrid = document.createElement('div');
+    crewGrid.className = 'mm-crew';
+    data.keyCrew.forEach(({ role, name }) => {
+      const row = document.createElement('div');
+      row.className = 'mm-crew-row';
+      row.innerHTML = `<span class="mm-crew-role">${role}</span><span class="mm-crew-name">${name}</span>`;
+      crewGrid.appendChild(row);
+    });
+    info.appendChild(crewGrid);
+  }
+
+  body.append(posterCol, info);
+}
+
+function closeMovieModal() {
+  document.getElementById('movie-modal-backdrop').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+document.getElementById('movie-modal-close').addEventListener('click', closeMovieModal);
+document.getElementById('movie-modal-backdrop').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeMovieModal();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMovieModal(); });
+
+// Delegate card clicks across all grids
+document.querySelector('main').addEventListener('click', (e) => {
+  const card = e.target.closest('.movie-card');
+  if (!card) return;
+  if (e.target.closest('.card-remove-btn, .card-star-btn')) return;
+  const titleEl = card.querySelector('.card-name');
+  if (!titleEl) return;
+  const title = titleEl.textContent;
+  // Find movie in any list
+  const allLists = [movies, loadWatchlist(), loadMaybe(), loadMeh(), loadBanned()];
+  const movie = allLists.flatMap(l => l).find(m => m.title === title);
+  if (movie) openMovieModal(movie);
 });
 

@@ -16,14 +16,17 @@
     <nav>
       <a href="index.html" class="nav-link">People</a>
       <a href="movies.html" class="nav-link active">Movies</a>
+      <a href="tv-series.html" class="nav-link">TV Series</a>
+      <a href="books.html" class="nav-link">Books</a>
       <a href="settings.html" class="nav-link">Settings</a>
     </nav>
-    <div class="header-grid-nav" id="header-grid-nav"></div>
   </header>
 
   <main>
     <div class="recommendation" id="recommendation"></div>
     <div class="grid-nav" id="grid-nav"></div>
+    <div id="standards-wrap"></div>
+    <div id="persona-wrap"></div>
     <div class="grid" id="grid-collection"></div>
     <div class="grid" id="grid-watchlist" style="display:none"></div>
     <div class="grid" id="grid-maybe"     style="display:none"></div>
@@ -37,6 +40,12 @@
     <span class="grain-value" id="grain-value" hidden>4%</span>
     <input type="range" id="dark-slider" class="grain-slider" min="0" max="100" step="1" value="100" hidden>
     <span class="grain-value" id="dark-value" hidden>+100%</span>
+  </div>
+  <div id="movie-modal-backdrop" class="movie-modal-backdrop" style="display:none">
+    <div class="movie-modal" id="movie-modal">
+      <button class="movie-modal-close" id="movie-modal-close">✕</button>
+      <div class="movie-modal-body" id="movie-modal-body"></div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script src="movies-data.js"></script>
