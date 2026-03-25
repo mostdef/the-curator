@@ -6,6 +6,13 @@ const TMDB_IMG  = 'https://image.tmdb.org/t/p/';
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
+  let getAuthenticatedUser;
+  try { getAuthenticatedUser = require('./_auth'); } catch {}
+  if (getAuthenticatedUser) {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const q = (req.query.q || '').trim();
   if (q.length < 2) return res.status(400).end();
 

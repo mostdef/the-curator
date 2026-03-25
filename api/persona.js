@@ -4,6 +4,13 @@ const Anthropic = require('@anthropic-ai/sdk');
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
+  let getAuthenticatedUser;
+  try { getAuthenticatedUser = require('./_auth'); } catch {}
+  if (getAuthenticatedUser) {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const { standards = [] } = req.body;
   if (standards.length === 0) return res.status(400).json({ error: 'no_standards' });
 

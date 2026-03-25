@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Collection — Sign In</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+
+    input[type="email"] {
+      width: 100%;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #e0e0e0;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+
+    input[type="email"]:focus {
+      border-color: #666;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      background: #fff;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #e8e8e8;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 20px;
+      font-size: 13px;
+      min-height: 20px;
+      text-align: center;
+    }
+
+    .status.success { color: #6ee7b7; }
+    .status.error   { color: #f87171; }
+  </style>
+</head>
+<body>
+
+  <!-- Supabase config — fill in real values before deploying -->
+  <script>
+    window.__SUPABASE_URL__ = '';
+    window.__SUPABASE_ANON_KEY__ = '';
+  </script>
+
+  <!-- Supabase JS v2 from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Auth module -->
+  <script src="/auth.js"></script>
+
+  <div class="card">
+    <div class="title">The Collection</div>
+    <div class="subtitle">Enter your email to sign in</div>
+
+    <form id="login-form">
+      <label for="email">Email address</label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        placeholder="you@example.com"
+        required
+        autocomplete="email"
+      />
+      <button type="submit" id="submit-btn">Send magic link</button>
+    </form>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    (async function () {
+      // If already authenticated, go straight to the app
+      const session = await getSession();
+      if (session) {
+        window.location.href = '/movies.html';
+        return;
+      }
+
+      const form = document.getElementById('login-form');
+      const emailInput = document.getElementById('email');
+      const submitBtn = document.getElementById('submit-btn');
+      const statusEl = document.getElementById('status');
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        if (!email) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+        statusEl.textContent = '';
+        statusEl.className = 'status';
+
+        try {
+          await signInWithMagicLink(email);
+          statusEl.textContent = 'Check your email for the magic link.';
+          statusEl.className = 'status success';
+          form.reset();
+        } catch (err) {
+          statusEl.textContent = err.message || 'Something went wrong. Please try again.';
+          statusEl.className = 'status error';
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send magic link';
+        }
+      });
+    })();
+  </script>
+
+</body>
+</html>
