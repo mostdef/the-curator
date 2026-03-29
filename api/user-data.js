@@ -1,5 +1,5 @@
-const { getAuthenticatedUser } = require('./_auth');
-const { supabaseAdmin }        = require('./_supabase');
+const getAuthenticatedUser = require('./_auth');
+const supabaseAdmin        = require('./_supabase');
 
 const FIELDS = ['movies', 'watchlist', 'maybe', 'meh', 'banned', 'standards', 'total_cost'];
 
