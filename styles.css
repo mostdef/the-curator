@@ -2690,4 +2690,421 @@ main {
   .nww-pill { width: 100%; border-radius: 0; height: 44px; }
   .nww-panel { width: 100%; border-radius: 16px 16px 0 0; }
   .nww-idle-btn { position: fixed; right: 16px; bottom: 16px; }
+  .nww-companion-open-btn { display: none !important; }
+}
+
+/* ── Now Watching Companion ──────────────────────────────────────────────── */
+
+/* Companion open button (shown inside controls panel) */
+.nww-companion-open-btn {
+  display: none;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.5);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nww-companion-open-btn:hover {
+  border-color: rgba(255,215,0,0.3);
+  color: rgba(255,255,255,0.8);
+  background: rgba(255,215,0,0.05);
+}
+.nww-companion-open-btn:active { transform: scale(0.98); }
+
+/* Show button only when expanded or deciding */
+.nww--expanded .nww-companion-open-btn,
+.nww--deciding .nww-companion-open-btn { display: block; }
+
+/* Hide when companion is already open */
+.nww--companion-open .nww-companion-open-btn { display: none !important; }
+
+/* ── Layout: companion open ──────────────────────────────────────────────── */
+.nww--companion-open {
+  display: flex !important;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Companion panel */
+.nww-companion {
+  display: none;
+  flex-direction: column;
+  width: 260px;
+  max-height: 560px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 16px;
+  gap: 12px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.nww--companion-open .nww-companion {
+  display: flex;
+  animation: nww-companion-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes nww-companion-in {
+  from { opacity: 0; transform: translateX(-12px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* ── Companion header ────────────────────────────────────────────────────── */
+.nww-companion-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.nww-companion-title-text {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nww-companion-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nww-companion-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  flex: 1;
+}
+.nww-companion-toggle-wrap input[type="checkbox"] { display: none; }
+.nww-companion-toggle-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.nww-companion-toggle-wrap input:checked ~ .nww-companion-toggle-label {
+  color: rgba(255,215,0,0.8);
+}
+
+/* Model toggle */
+.nww-model-toggle {
+  display: flex;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.nww-model-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nww-model-btn.active {
+  background: rgba(255,215,0,0.1);
+  color: rgba(255,255,255,0.9);
+}
+.nww-model-btn:hover:not(.active) { color: rgba(255,255,255,0.6); }
+
+/* Close button */
+.nww-companion-close {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.nww-companion-close:hover { color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.2); }
+.nww-companion-close:active { transform: scale(0.92); }
+
+/* ── Facts section ───────────────────────────────────────────────────────── */
+.nww-facts-section { display: flex; flex-direction: column; gap: 6px; }
+.nww-facts-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: rgba(255,255,255,0.25);
+}
+.nww-facts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.nww-facts-list::-webkit-scrollbar { width: 4px; }
+.nww-facts-list::-webkit-scrollbar-track { background: transparent; }
+.nww-facts-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.nww-facts-loading { display: flex; flex-direction: column; gap: 6px; }
+.nww-facts-skeleton {
+  height: 52px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 100%);
+  background-size: 200% 100%;
+  animation: nww-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes nww-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Fact card */
+.nww-fact-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.02);
+  transition: border-color 0.2s, background 0.2s;
+  animation: nww-fact-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes nww-fact-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.nww-fact-card:hover {
+  border-color: rgba(255,255,255,0.13);
+  background: rgba(255,255,255,0.04);
+}
+.nww-fact-card.nww-fact-new {
+  border-color: rgba(255,215,0,0.3);
+  background: rgba(255,215,0,0.06);
+  animation: nww-fact-highlight 0.7s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes nww-fact-highlight {
+  0%  { border-color: rgba(255,215,0,0.5); background: rgba(255,215,0,0.12); box-shadow: 0 0 16px rgba(255,215,0,0.2); }
+  60% { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.06); }
+  100%{ border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.06); }
+}
+.nww-fact-pct {
+  font-family: 'Oswald', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(255,215,0,0.6);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.nww-fact-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.75);
+}
+.nww-facts-error {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  padding: 8px 0;
+}
+.nww-facts-retry {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.5);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  padding: 5px 10px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all 0.15s;
+}
+.nww-facts-retry:hover { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); }
+
+/* Pill pulse when new fact arrives */
+@keyframes nww-pill-fact-pulse {
+  0%   { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 0 rgba(255,215,0,0); }
+  40%  { box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 28px rgba(255,215,0,0.35); }
+  100% { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 0 rgba(255,215,0,0); }
+}
+.nww-pill.nww-pill-fact-pulse {
+  animation: nww-pill-fact-pulse 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* ── Companion divider ────────────────────────────────────────────────────── */
+.nww-companion-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+
+/* ── Chat thread ─────────────────────────────────────────────────────────── */
+.nww-chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 60px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.nww-chat-thread::-webkit-scrollbar { width: 4px; }
+.nww-chat-thread::-webkit-scrollbar-track { background: transparent; }
+.nww-chat-thread::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.nww-chat-thread:empty::after {
+  content: 'Ask anything about this film';
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,0.2);
+  font-style: italic;
+}
+
+.nww-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: nww-msg-in 0.25s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes nww-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nww-msg-user { align-items: flex-end; }
+.nww-msg-assistant { align-items: flex-start; }
+
+.nww-msg-bubble {
+  max-width: 90%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.nww-msg-user .nww-msg-bubble {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  border-radius: 10px 10px 3px 10px;
+}
+.nww-msg-assistant .nww-msg-bubble {
+  background: rgba(255,215,0,0.05);
+  border: 1px solid rgba(255,215,0,0.12);
+  color: rgba(255,255,255,0.85);
+  border-radius: 10px 10px 10px 3px;
+}
+.nww-msg-loading .nww-msg-bubble {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Typing dots */
+.nww-typing {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  padding: 4px 2px;
+}
+.nww-typing-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  animation: nww-typing-bounce 1.2s ease-in-out infinite;
+}
+.nww-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.nww-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes nww-typing-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-5px); opacity: 1; }
+}
+
+.nww-msg-error .nww-msg-bubble {
+  background: rgba(204,85,85,0.06);
+  border-color: rgba(204,85,85,0.2);
+  color: rgba(204,85,85,0.8);
+}
+
+/* ── Chat input area ─────────────────────────────────────────────────────── */
+.nww-chat-input-area {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.nww-chat-input {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.nww-chat-input::placeholder { color: rgba(255,255,255,0.25); }
+.nww-chat-input:focus { border-color: rgba(255,255,255,0.2); }
+.nww-chat-send {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,215,0,0.12);
+  border: 1px solid rgba(255,215,0,0.25);
+  border-radius: 8px;
+  color: rgba(255,215,0,0.9);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.nww-chat-send:hover { background: rgba(255,215,0,0.2); border-color: rgba(255,215,0,0.4); }
+.nww-chat-send:active { transform: scale(0.92); }
+.nww-chat-send:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+/* ── Companion footer (session cost) ─────────────────────────────────────── */
+.nww-companion-footer {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: rgba(255,255,255,0.2);
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  min-height: 14px;
+}
+
+/* ── Reduced motion additions ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .nww-companion { animation: none !important; }
+  .nww-fact-card { animation: none !important; }
+  .nww-fact-card.nww-fact-new { animation: none !important; }
+  .nww-facts-skeleton { animation: none !important; background: rgba(255,255,255,0.05); }
+  .nww-msg { animation: none !important; }
+  .nww-typing-dot { animation: none !important; }
+  .nww-pill.nww-pill-fact-pulse { animation: none !important; }
 }

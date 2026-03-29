@@ -45,6 +45,46 @@
       <div class="nww-pill-bar"><div class="nww-pill-bar-fill" id="nww-pill-bar-fill"></div></div>
     </div>
 
+    <!-- Companion panel -->
+    <div class="nww-companion" id="nww-companion">
+      <div class="nww-companion-header">
+        <span class="nww-companion-title-text" id="nww-companion-title"></span>
+        <div class="nww-companion-header-controls">
+          <label class="nww-companion-toggle-wrap">
+            <input type="checkbox" id="nww-companion-spoiler">
+            <span class="nww-companion-toggle-label">Spoilers OK</span>
+          </label>
+          <div class="nww-model-toggle">
+            <button class="nww-model-btn" data-model="sonnet" id="nww-model-sonnet">Sonnet</button>
+            <button class="nww-model-btn" data-model="haiku" id="nww-model-haiku">Haiku</button>
+          </div>
+          <button class="nww-companion-close" id="nww-companion-close">✕</button>
+        </div>
+      </div>
+
+      <div class="nww-facts-section">
+        <div class="nww-facts-label">FILM NOTES</div>
+        <div class="nww-facts-list" id="nww-facts-list">
+          <div class="nww-facts-loading" id="nww-facts-loading">
+            <div class="nww-facts-skeleton"></div>
+            <div class="nww-facts-skeleton"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nww-companion-divider"></div>
+
+      <div class="nww-chat-thread" id="nww-chat-thread"></div>
+
+      <div class="nww-chat-input-area">
+        <input type="text" class="nww-chat-input" id="nww-chat-input"
+               placeholder="Ask anything about this film…" autocomplete="off">
+        <button class="nww-chat-send" id="nww-chat-send">↑</button>
+      </div>
+
+      <div class="nww-companion-footer" id="nww-companion-footer"></div>
+    </div>
+
     <!-- Expanded panel -->
     <div class="nww-panel" id="nww-panel">
       <!-- Search sub-panel -->
@@ -77,6 +117,7 @@
           <button class="nww-btn nww-btn-done" id="nww-done-btn">Done</button>
           <button class="nww-btn nww-btn-abandon" id="nww-abandon-btn">Abandon</button>
         </div>
+        <button class="nww-companion-open-btn" id="nww-companion-open-btn">◎ Companion</button>
         <div class="nww-decisions" id="nww-decisions" style="display:none">
           <div class="nww-decisions-label">How was it?</div>
           <button class="nww-dec-btn nww-dec-collection" id="nww-dec-collection">Collection</button>

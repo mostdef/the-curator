@@ -42,6 +42,7 @@ All keys prefixed `thecollection_`:
 | `thecollection_card_ratings` | Toggle: show IMDb/RT on cards |
 | `thecollection_sort_*` | Per-view sort modes |
 | `thecollection_rec_cache` | Cached last recommendation |
+| `thecollection_taste_signals` | Watch session outcome signals (array, newest first, max 50) |
 
 ## Key Architecture Patterns
 

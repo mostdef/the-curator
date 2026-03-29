@@ -1270,7 +1270,8 @@ const MAYBE_KEY      = 'thecollection_maybe';
 const MEH_KEY        = 'thecollection_meh';
 const SNAPSHOTS_KEY  = 'thecollection_snapshots';
 const STANDARDS_KEY  = 'thecollection_standards';
-const TOTAL_COST_KEY = 'thecollection_total_cost';
+const TOTAL_COST_KEY      = 'thecollection_total_cost';
+const TASTE_SIGNALS_KEY   = 'thecollection_taste_signals';
 totalCost = parseFloat(localStorage.getItem(TOTAL_COST_KEY) || '0') || 0;
 
 // ── Supabase sync ─────────────────────────────────────────────────────────────
@@ -2392,6 +2393,20 @@ const nww = {
   decMeh: document.getElementById('nww-dec-meh'),
   decBan: document.getElementById('nww-dec-ban'),
   confirmation: document.getElementById('nww-confirmation'),
+  // Companion
+  companionPanel:     document.getElementById('nww-companion'),
+  companionTitle:     document.getElementById('nww-companion-title'),
+  companionSpoiler:   document.getElementById('nww-companion-spoiler'),
+  companionClose:     document.getElementById('nww-companion-close'),
+  companionOpenBtn:   document.getElementById('nww-companion-open-btn'),
+  modelSonnet:        document.getElementById('nww-model-sonnet'),
+  modelHaiku:         document.getElementById('nww-model-haiku'),
+  factsList:          document.getElementById('nww-facts-list'),
+  factsLoading:       document.getElementById('nww-facts-loading'),
+  chatThread:         document.getElementById('nww-chat-thread'),
+  chatInput:          document.getElementById('nww-chat-input'),
+  chatSend:           document.getElementById('nww-chat-send'),
+  companionFooter:    document.getElementById('nww-companion-footer'),
   interval: null,
   searchDebounce: null,
   state: 'idle' // idle | searching | playing | expanded | deciding
@@ -2501,6 +2516,11 @@ function nwwUpdateDisplay() {
     nwwSetState('expanded');
     nwwShowDecisions();
   }
+
+  // Companion: deliver timed facts
+  if (data.companion?.facts?.length) {
+    nwwMaybeDeliverFact(elapsedMs, data);
+  }
 }
 
 function nwwStartInterval() {
@@ -2553,6 +2573,7 @@ function nwwActivate(movie, sourceView) {
     sourceView: sourceView || 'search',
     startedAt: Date.now(), pausedAt: null, accumulatedMs: 0
   };
+  data.companion = nwwDefaultCompanion();
   saveNowWatching(data);
   nwwPopulatePlaying(data);
   nwwSetState('playing');
@@ -2576,11 +2597,353 @@ function nwwActivate(movie, sourceView) {
   }
 }
 
+// ── Companion ─────────────────────────────────────────────────────────────────
+
+function nwwDefaultCompanion() {
+  return {
+    open: false,
+    facts_fetched: false,
+    facts_loading: false,
+    facts: [],
+    chat_history: [],
+    session_cost: 0,
+    spoilers_ok: false,
+    model_mode: 'sonnet',
+  };
+}
+
+function nwwSetCompanionOpen(open) {
+  nww.el.classList.toggle('nww--companion-open', open);
+  const data = loadNowWatching();
+  if (data) {
+    if (!data.companion) data.companion = nwwDefaultCompanion();
+    data.companion.open = open;
+    saveNowWatching(data);
+  }
+}
+
+function nwwCompanionUpdateFooter(sessionCost) {
+  if (sessionCost > 0) {
+    nww.companionFooter.textContent = `Session: $${sessionCost.toFixed(4)}`;
+  } else {
+    nww.companionFooter.textContent = '';
+  }
+}
+
+function nwwCompanionUpdateModelBtns(modelMode) {
+  nww.modelSonnet.classList.toggle('active', modelMode !== 'haiku');
+  nww.modelHaiku.classList.toggle('active', modelMode === 'haiku');
+}
+
+function nwwRenderCompanion(data) {
+  if (!data) {
+    nww.chatThread.innerHTML = '';
+    nww.factsList.innerHTML = '<div class="nww-facts-loading" id="nww-facts-loading"><div class="nww-facts-skeleton"></div><div class="nww-facts-skeleton"></div></div>';
+    nww.factsLoading = document.getElementById('nww-facts-loading');
+    nww.companionFooter.textContent = '';
+    return;
+  }
+  const c = data.companion || nwwDefaultCompanion();
+  nww.companionTitle.textContent = data.title || '';
+  nww.companionSpoiler.checked = c.spoilers_ok;
+  nwwCompanionUpdateModelBtns(c.model_mode);
+
+  // Render delivered facts
+  nww.factsList.innerHTML = '';
+  const delivered = c.facts.filter(f => f.delivered);
+  if (delivered.length) {
+    delivered.forEach(f => nwwAppendFact(f, false));
+  } else if (!c.facts_fetched) {
+    nww.factsList.innerHTML = '<div class="nww-facts-loading" id="nww-facts-loading"><div class="nww-facts-skeleton"></div><div class="nww-facts-skeleton"></div></div>';
+    nww.factsLoading = document.getElementById('nww-facts-loading');
+  }
+
+  // Render chat history
+  nww.chatThread.innerHTML = '';
+  (c.chat_history || []).forEach(msg => nwwAppendChatBubble(msg.role, msg.content, false));
+
+  nwwCompanionUpdateFooter(c.session_cost || 0);
+  nww.chatThread.scrollTop = nww.chatThread.scrollHeight;
+}
+
+function nwwAppendFact(fact, isNew = true) {
+  const card = document.createElement('div');
+  card.className = 'nww-fact-card' + (isNew ? ' nww-fact-new' : '');
+  card.innerHTML = `<div class="nww-fact-pct">~${fact.pct}% in</div><div class="nww-fact-text">${fact.text}</div>`;
+  nww.factsList.appendChild(card);
+  nww.factsList.scrollTop = nww.factsList.scrollHeight;
+}
+
+function nwwAppendChatBubble(role, content, animate = true) {
+  const msg = document.createElement('div');
+  msg.className = `nww-msg nww-msg-${role}${!animate ? ' no-anim' : ''}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'nww-msg-bubble';
+  bubble.textContent = content;
+  msg.appendChild(bubble);
+  nww.chatThread.appendChild(msg);
+  nww.chatThread.scrollTop = nww.chatThread.scrollHeight;
+  return msg;
+}
+
+function nwwAppendTyping() {
+  const msg = document.createElement('div');
+  msg.className = 'nww-msg nww-msg-assistant nww-msg-loading';
+  msg.innerHTML = '<div class="nww-msg-bubble"><div class="nww-typing"><div class="nww-typing-dot"></div><div class="nww-typing-dot"></div><div class="nww-typing-dot"></div></div></div>';
+  nww.chatThread.appendChild(msg);
+  nww.chatThread.scrollTop = nww.chatThread.scrollHeight;
+  return msg;
+}
+
+async function nwwFetchFacts(data) {
+  if (!data.companion) data.companion = nwwDefaultCompanion();
+  data.companion.facts_loading = true;
+  saveNowWatching(data);
+
+  // Show skeleton if companion is open
+  if (data.companion.open && !nww.factsList.querySelector('.nww-facts-skeleton')) {
+    nww.factsList.innerHTML = '<div class="nww-facts-loading" id="nww-facts-loading"><div class="nww-facts-skeleton"></div><div class="nww-facts-skeleton"></div></div>';
+    nww.factsLoading = document.getElementById('nww-facts-loading');
+  }
+
+  try {
+    const res = await fetch('/api/companion-facts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: data.title,
+        year: data.year,
+        director: data.director,
+        runtime: data.runtime,
+        model: data.companion.model_mode || 'sonnet',
+        spoilers_ok: data.companion.spoilers_ok,
+      }),
+    });
+    const json = await res.json();
+
+    const nwData = loadNowWatching();
+    if (!nwData || nwData.title !== data.title) return; // session changed
+
+    nwData.companion.facts = (json.facts || []).map(f => ({ ...f, delivered: false }));
+    nwData.companion.facts_fetched = true;
+    nwData.companion.facts_loading = false;
+    if (json.api_cost) {
+      nwData.companion.session_cost = (nwData.companion.session_cost || 0) + json.api_cost;
+      totalCost += json.api_cost;
+      localStorage.setItem(TOTAL_COST_KEY, totalCost.toFixed(6));
+      schedulePush();
+      updateRecCostHint();
+    }
+    saveNowWatching(nwData);
+
+    // Deliver any facts already passed
+    const elapsedMs = nwwGetElapsed(nwData);
+    const runtimeMs = (nwData.runtime || 0) * 60000;
+    if (runtimeMs > 0) {
+      const pct = (elapsedMs / runtimeMs) * 100;
+      nwData.companion.facts.forEach(f => {
+        if (pct >= f.pct) f.delivered = true;
+      });
+      saveNowWatching(nwData);
+    }
+
+    if (nwData.companion.open) {
+      nww.factsList.innerHTML = '';
+      nwData.companion.facts.filter(f => f.delivered).forEach(f => nwwAppendFact(f, false));
+      nwwCompanionUpdateFooter(nwData.companion.session_cost);
+    }
+  } catch {
+    const nwData = loadNowWatching();
+    if (nwData?.companion) {
+      nwData.companion.facts_loading = false;
+      saveNowWatching(nwData);
+    }
+    if (nww.el.classList.contains('nww--companion-open')) {
+      nww.factsList.innerHTML = '<div class="nww-facts-error">Couldn\'t load film notes. <button class="nww-facts-retry" id="nww-facts-retry">Retry</button></div>';
+      document.getElementById('nww-facts-retry')?.addEventListener('click', () => {
+        const d = loadNowWatching();
+        if (d) nwwFetchFacts(d);
+      });
+    }
+  }
+}
+
+function nwwMaybeDeliverFact(elapsedMs, data) {
+  const c = data.companion;
+  if (!c?.facts?.length) return;
+  const runtimeMs = (data.runtime || 0) * 60000;
+  if (runtimeMs === 0) return;
+  const pct = (elapsedMs / runtimeMs) * 100;
+
+  const next = c.facts.find(f => !f.delivered && pct >= f.pct);
+  if (!next) return;
+
+  next.delivered = true;
+  saveNowWatching(data);
+
+  if (c.open) {
+    nwwAppendFact(next, true);
+  } else {
+    // Pulse pill to signal new fact
+    nww.pill.classList.remove('nww-pill-fact-pulse');
+    nww.pill.offsetWidth; // reflow
+    nww.pill.classList.add('nww-pill-fact-pulse');
+    nww.pill.addEventListener('animationend', () => nww.pill.classList.remove('nww-pill-fact-pulse'), { once: true });
+  }
+}
+
+async function nwwSendChat(message) {
+  const data = loadNowWatching();
+  if (!data?.companion) return;
+
+  nww.chatInput.value = '';
+  nww.chatSend.disabled = true;
+  nwwAppendChatBubble('user', message);
+  const typingEl = nwwAppendTyping();
+
+  const elapsedMs = nwwGetElapsed(data);
+  const runtimeMs = (data.runtime || 0) * 60000;
+  const elapsed_pct = runtimeMs > 0 ? (elapsedMs / runtimeMs) * 100 : 0;
+
+  try {
+    const res = await fetch('/api/companion-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: data.title,
+        year: data.year,
+        director: data.director,
+        runtime: data.runtime,
+        elapsed_pct,
+        message,
+        chat_history: data.companion.chat_history || [],
+        spoilers_ok: data.companion.spoilers_ok,
+        model: data.companion.model_mode || 'sonnet',
+      }),
+    });
+    const json = await res.json();
+
+    typingEl.remove();
+
+    if (json.error) {
+      const errEl = nwwAppendChatBubble('assistant', 'Something went wrong — try again.', true);
+      errEl.classList.add('nww-msg-error');
+    } else {
+      nwwAppendChatBubble('assistant', json.reply);
+
+      const nwData = loadNowWatching();
+      if (nwData?.companion) {
+        nwData.companion.chat_history = [
+          ...(nwData.companion.chat_history || []),
+          { role: 'user', content: message },
+          { role: 'assistant', content: json.reply },
+        ].slice(-24); // keep last 12 pairs
+        if (json.api_cost) {
+          nwData.companion.session_cost = (nwData.companion.session_cost || 0) + json.api_cost;
+          totalCost += json.api_cost;
+          localStorage.setItem(TOTAL_COST_KEY, totalCost.toFixed(6));
+          schedulePush();
+          updateRecCostHint();
+          nwwCompanionUpdateFooter(nwData.companion.session_cost);
+        }
+        saveNowWatching(nwData);
+      }
+    }
+  } catch {
+    typingEl.remove();
+    const errEl = nwwAppendChatBubble('assistant', 'Something went wrong — try again.', true);
+    errEl.classList.add('nww-msg-error');
+  }
+
+  nww.chatSend.disabled = false;
+  nww.chatInput.focus();
+}
+
+function nwwExtractTasteSignal(data, decision) {
+  const elapsedMs = nwwGetElapsed(data);
+  const runtimeMs = (data.runtime || 0) * 60000;
+  const elapsed_pct = runtimeMs > 0 ? Math.round((elapsedMs / runtimeMs) * 100) : null;
+  const signal = {
+    timestamp:          Date.now(),
+    title:              data.title,
+    year:               data.year,
+    director:           data.director,
+    decision,
+    elapsed_pct,
+    runtime_min:        data.runtime || null,
+    watch_duration_min: Math.round(elapsedMs / 60000),
+    abandoned:          decision === 'banned' && elapsed_pct !== null && elapsed_pct < 50,
+    chat_turns:         Math.floor((data.companion?.chat_history?.length || 0) / 2),
+    source_view:        data.sourceView,
+  };
+  try {
+    const signals = JSON.parse(localStorage.getItem(TASTE_SIGNALS_KEY) || '[]');
+    signals.unshift(signal);
+    if (signals.length > 50) signals.length = 50;
+    localStorage.setItem(TASTE_SIGNALS_KEY, JSON.stringify(signals));
+    schedulePush();
+  } catch {}
+}
+
+// Companion event listeners
+nww.companionOpenBtn.addEventListener('click', () => {
+  const data = loadNowWatching();
+  if (!data) return;
+  if (!data.companion) {
+    data.companion = nwwDefaultCompanion();
+    saveNowWatching(data);
+  }
+  nwwSetCompanionOpen(true);
+  nwwRenderCompanion(loadNowWatching());
+  if (!data.companion.facts_fetched && !data.companion.facts_loading) {
+    nwwFetchFacts(loadNowWatching());
+  }
+});
+
+nww.companionClose.addEventListener('click', () => nwwSetCompanionOpen(false));
+
+nww.companionSpoiler.addEventListener('change', () => {
+  const data = loadNowWatching();
+  if (!data?.companion) return;
+  data.companion.spoilers_ok = nww.companionSpoiler.checked;
+  saveNowWatching(data);
+});
+
+[nww.modelSonnet, nww.modelHaiku].forEach(btn => {
+  btn.addEventListener('click', () => {
+    const data = loadNowWatching();
+    if (!data?.companion) return;
+    data.companion.model_mode = btn.dataset.model;
+    saveNowWatching(data);
+    nwwCompanionUpdateModelBtns(data.companion.model_mode);
+  });
+});
+
+nww.chatSend.addEventListener('click', () => {
+  const msg = nww.chatInput.value.trim();
+  if (msg) nwwSendChat(msg);
+});
+
+nww.chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    const msg = nww.chatInput.value.trim();
+    if (msg) nwwSendChat(msg);
+  }
+  if (e.key === 'Escape') {
+    e.stopPropagation(); // prevent widget collapse
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function nwwToIdle() {
   nwwStopInterval();
   clearNowWatching();
   nwwSetState('idle');
-  nww.el.classList.remove('nww--complete');
+  nww.el.classList.remove('nww--complete', 'nww--companion-open');
+  nwwRenderCompanion(null);
 }
 
 function nwwCommitDecision(target) {
@@ -2612,6 +2975,7 @@ function nwwCommitDecision(target) {
   }
 
   nwwStopInterval();
+  nwwExtractTasteSignal(data, target);
   clearNowWatching();
 
   // Show confirmation
@@ -2815,6 +3179,20 @@ function watchTonight(movie, sourceView) {
     nwwSetState('playing');
     nwwUpdateDisplay();
     nwwStartInterval();
+  }
+
+  // Restore companion if it was open
+  if (data.companion?.open) {
+    nww.el.classList.add('nww--companion-open');
+    nwwRenderCompanion(data);
+    // Re-fetch facts if loading was interrupted
+    if (!data.companion.facts_fetched) {
+      if (data.companion.facts_loading) {
+        data.companion.facts_loading = false;
+        saveNowWatching(data);
+      }
+      nwwFetchFacts(loadNowWatching());
+    }
   }
 })();
 
