@@ -1,66 +1,66 @@
 // auth.js — client-side auth module for The Collection
-// Assumes supabase-js is loaded via a script tag before this file
-// and window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__ are set
+// Bootstraps Supabase client from /api/config, then exposes auth helpers.
 
-(function () {
-  const supabaseClient = window.supabase.createClient(
-    window.__SUPABASE_URL__,
-    window.__SUPABASE_ANON_KEY__
-  );
+let supabaseClient = null;
 
-  // Redirect to login on sign-out
+// initAuth() — call once on page load, before any auth methods are used.
+// Returns the Supabase client.
+async function initAuth() {
+  if (supabaseClient) return supabaseClient;
+
+  const cfg = await fetch('/api/config').then(r => r.json());
+  supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+
   supabaseClient.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
       window.location.href = '/login.html';
     }
   });
 
-  // Returns the current session or null
-  async function getSession() {
-    const { data } = await supabaseClient.auth.getSession();
-    return data.session || null;
-  }
+  return supabaseClient;
+}
 
-  // Returns the current user object { id, email } or null
-  async function getUser() {
-    const session = await getSession();
-    return session ? session.user : null;
-  }
+async function getSession() {
+  await initAuth();
+  const { data } = await supabaseClient.auth.getSession();
+  return data.session || null;
+}
 
-  // Returns the JWT access token string for API calls, or null
-  async function getAuthToken() {
-    const session = await getSession();
-    return session ? session.access_token : null;
-  }
+async function getUser() {
+  const session = await getSession();
+  return session ? session.user : null;
+}
 
-  // Sends a magic link to the given email address
-  async function signInWithMagicLink(email) {
-    const { error } = await supabaseClient.auth.signInWithOtp({ email });
-    if (error) throw error;
-  }
+async function getAuthToken() {
+  const session = await getSession();
+  return session ? session.access_token : null;
+}
 
-  // Signs the user out and redirects to login.html
-  async function signOut() {
-    await supabaseClient.auth.signOut();
+async function signInWithMagicLink(email) {
+  await initAuth();
+  const { error } = await supabaseClient.auth.signInWithOtp({ email });
+  if (error) throw error;
+}
+
+async function signOut() {
+  await initAuth();
+  await supabaseClient.auth.signOut();
+  window.location.href = '/login.html';
+}
+
+async function requireAuth() {
+  const session = await getSession();
+  if (!session) {
     window.location.href = '/login.html';
+    return false;
   }
+  return true;
+}
 
-  // Checks if the user is authenticated. Redirects to login.html if not.
-  // Returns true if authenticated, false otherwise.
-  async function requireAuth() {
-    const session = await getSession();
-    if (!session) {
-      window.location.href = '/login.html';
-      return false;
-    }
-    return true;
-  }
-
-  // Expose on window
-  window.getSession = getSession;
-  window.getUser = getUser;
-  window.getAuthToken = getAuthToken;
-  window.signInWithMagicLink = signInWithMagicLink;
-  window.signOut = signOut;
-  window.requireAuth = requireAuth;
-})();
+window.initAuth         = initAuth;
+window.getSession       = getSession;
+window.getUser          = getUser;
+window.getAuthToken     = getAuthToken;
+window.signInWithMagicLink = signInWithMagicLink;
+window.signOut          = signOut;
+window.requireAuth      = requireAuth;

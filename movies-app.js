@@ -862,7 +862,7 @@ async function fetchRecommendation() {
         sessionCost += rec.api_cost;
         sessionSearches++;
         totalCost += rec.api_cost;
-        localStorage.setItem(TOTAL_COST_KEY, totalCost.toFixed(6));
+        localStorage.setItem(TOTAL_COST_KEY, totalCost.toFixed(6)); schedulePush();
       }
     } else {
       recError = true;
@@ -1272,11 +1272,59 @@ const SNAPSHOTS_KEY  = 'thecollection_snapshots';
 const STANDARDS_KEY  = 'thecollection_standards';
 const TOTAL_COST_KEY = 'thecollection_total_cost';
 totalCost = parseFloat(localStorage.getItem(TOTAL_COST_KEY) || '0') || 0;
+
+// ── Supabase sync ─────────────────────────────────────────────────────────────
+// Hydrate localStorage from Supabase on load, then push changes back debounced.
+
+let _syncDebounce = null;
+
+async function supabasePush() {
+  const token = await getAuthToken().catch(() => null);
+  if (!token) return;
+  const payload = {
+    movies:     JSON.parse(localStorage.getItem(STORAGE_KEY)   || '[]'),
+    watchlist:  JSON.parse(localStorage.getItem(WATCHLIST_KEY) || '[]'),
+    maybe:      JSON.parse(localStorage.getItem(MAYBE_KEY)     || '[]'),
+    meh:        JSON.parse(localStorage.getItem(MEH_KEY)       || '[]'),
+    banned:     JSON.parse(localStorage.getItem(BANNED_KEY)    || '[]'),
+    standards:  JSON.parse(localStorage.getItem(STANDARDS_KEY) || '[]'),
+    total_cost: parseFloat(localStorage.getItem(TOTAL_COST_KEY) || '0') || 0,
+  };
+  fetch('/api/user-data', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+
+function schedulePush() {
+  clearTimeout(_syncDebounce);
+  _syncDebounce = setTimeout(supabasePush, 2000);
+}
+
+async function supabaseHydrate() {
+  const token = await getAuthToken().catch(() => null);
+  if (!token) return; // not logged in — use localStorage as-is
+  try {
+    const res = await fetch('/api/user-data', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.movies    !== undefined) localStorage.setItem(STORAGE_KEY,   JSON.stringify(data.movies));
+    if (data.watchlist !== undefined) localStorage.setItem(WATCHLIST_KEY, JSON.stringify(data.watchlist));
+    if (data.maybe     !== undefined) localStorage.setItem(MAYBE_KEY,     JSON.stringify(data.maybe));
+    if (data.meh       !== undefined) localStorage.setItem(MEH_KEY,       JSON.stringify(data.meh));
+    if (data.banned    !== undefined) localStorage.setItem(BANNED_KEY,    JSON.stringify(data.banned));
+    if (data.standards !== undefined) localStorage.setItem(STANDARDS_KEY, JSON.stringify(data.standards));
+    if (data.total_cost !== undefined) localStorage.setItem(TOTAL_COST_KEY, String(data.total_cost));
+  } catch(e) {}
+}
 const MAX_SNAPSHOTS  = 20;
 const MAX_STANDARDS  = 12;
 
 function loadStandards() { try { return JSON.parse(localStorage.getItem(STANDARDS_KEY) || '[]'); } catch(e) { return []; } }
-function saveStandards(list) { localStorage.setItem(STANDARDS_KEY, JSON.stringify(list)); }
+function saveStandards(list) { localStorage.setItem(STANDARDS_KEY, JSON.stringify(list)); schedulePush(); }
 
 function saveSnapshot(label = '') {
   const snap = {
@@ -1356,6 +1404,7 @@ function saveBanned(list) {
   localStorage.setItem(BANNED_KEY, JSON.stringify(list));
   invalidateTabCounts();
   if (gridView !== 'banned') markDirty('banned');
+  schedulePush();
 }
 
 function loadWatchlist() {
@@ -1365,6 +1414,7 @@ function saveWatchlist(list) {
   localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
   invalidateTabCounts();
   if (gridView !== 'watchlist') markDirty('watchlist');
+  schedulePush();
 }
 
 function loadMaybe() {
@@ -1374,6 +1424,7 @@ function saveMaybe(list) {
   localStorage.setItem(MAYBE_KEY, JSON.stringify(list));
   invalidateTabCounts();
   if (gridView !== 'maybe') markDirty('maybe');
+  schedulePush();
 }
 
 function loadMeh() {
@@ -1383,6 +1434,7 @@ function saveMeh(list) {
   localStorage.setItem(MEH_KEY, JSON.stringify(list));
   invalidateTabCounts();
   if (gridView !== 'meh') markDirty('meh');
+  schedulePush();
 }
 
 const BAN_SVG_SM = '❌';
@@ -1998,6 +2050,7 @@ function saveMovies() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(movies));
   invalidateTabCounts();
   if (gridView !== 'collection') markDirty('collection');
+  schedulePush();
 }
 
 function loadMovies() {
@@ -2021,11 +2074,16 @@ function syncOrderFromDOM() {
   saveMovies();
 }
 
-loadMovies();
-render(movies);
-renderGridNav();
-initRecHeading();
-fetchRecommendation();
+// Hydrate from Supabase then render. Falls back to localStorage if not logged in.
+(async function init() {
+  await initAuth().catch(() => {});
+  await supabaseHydrate();
+  loadMovies();
+  render(movies);
+  renderGridNav();
+  initRecHeading();
+  fetchRecommendation();
+})();
 
 
 setInterval(() => saveSnapshot('Auto-save · ' + new Date().toLocaleString()), 10 * 60 * 1000);
