@@ -1,12 +1,12 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.local') });
 const Anthropic = require('@anthropic-ai/sdk');
 
-const tasteProfile = (() => {
+function loadTasteProfile() {
   try {
     const p = require('path').join(__dirname, '..', 'taste-profile.json');
     return JSON.parse(require('fs').readFileSync(p, 'utf8')).prompt_section || null;
   } catch { return null; }
-})();
+}
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG  = 'https://image.tmdb.org/t/p/';
@@ -70,6 +70,8 @@ module.exports = async function handler(req, res) {
   const saturatedDirectors = Object.entries(directorCounts)
     .filter(([, count]) => count >= 3)
     .map(([d]) => d);
+
+  const tasteProfile = loadTasteProfile();
 
   const buildPrompt = (extraInstruction = '') => [
     `You are a film recommendation engine. Analyze this curated movie collection and recommend exactly 5 distinct films the curator is missing. Only recommend feature films — never TV series, miniseries, or documentaries.`,
