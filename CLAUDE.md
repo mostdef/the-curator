@@ -3,7 +3,7 @@
 ## Overview
 A personal film curation tool for reflective movie watching practice. Not a streaming app or social network — a personal archive where a cinephile deepens understanding of their own taste through deliberate selection, real-time watching companionship, and AI-assisted reflection. Vanilla JS/HTML/CSS, no build system. Deployed on Vercel with serverless API functions.
 
-**Design context**: See `.impeccable.md` for brand personality, aesthetic direction, and design principles.
+**Design context**: See `.impeccable.md` for brand personality, aesthetic direction, and design principles. **When working on any UI feature, always read `.impeccable.md` first and apply the `/frontend-design` skill principles** — brand is Curated, Intimate, Cinematic. Every surface should feel tactile, personal, and polished.
 
 **Dev:** `vercel dev` (runs browser-sync + API functions locally)
 
@@ -92,6 +92,15 @@ All keys prefixed `thecollection_`:
 ## External APIs
 - **Anthropic SDK** — recommendations, persona generation (model: sonnet or opus, user-switchable)
 - **OMDB** — movie search and details
+
+## Design Rules
+- Always read `.impeccable.md` before touching any UI
+- Run `/frontend-design` for any new component or visual feature
+- Run `/delight` after implementing a new interactive element
+- Typography: Playfair Display (display), Inter (body/UI), Oswald (labels/uppercase)
+- Gold (`#ffd700`) is reserved for standards, achievements, and completion states
+- Springy easing: `cubic-bezier(0.23, 1, 0.32, 1)` for all entrances
+- Respect `prefers-reduced-motion` — always add to the reduced-motion block in styles.css
 
 ## Things to Avoid
 - Don't call `render()` directly for user actions — use the `markDirty` + `setGridView` chain
