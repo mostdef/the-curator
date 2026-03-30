@@ -63,7 +63,7 @@ function renderPreview(snap, container) {
       <span>🍿 ${(snap.watchlist || []).length} to watch</span>
       <span>🎲 ${(snap.maybe || []).length} wildcard</span>
       <span>😑 ${(snap.meh || []).length} meh</span>
-      <span>👻 ${(snap.banned || []).length} don't recommend</span>
+      <span>🪦 ${(snap.banned || []).length} don't recommend</span>
     </div>`;
   container.appendChild(header);
 
@@ -147,7 +147,7 @@ async function loadServerSnapshots() {
           🍿 ${(snap.watchlist || []).length} &nbsp;
           🎲 ${(snap.maybe || []).length} &nbsp;
           😑 ${(snap.meh || []).length} &nbsp;
-          👻 ${(snap.banned || []).length}
+          🪦 ${(snap.banned || []).length}
         </span>`;
 
       const btn = document.createElement('button');

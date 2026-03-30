@@ -182,7 +182,32 @@ const textureCache = new Map();
 const TEXTURE_CACHE_MAX = 80;
 const TEXTURE_STORE_PREFIX = 'thecollection_tex_';
 
-function getCachedTextures(key) {
+// Deferred generation queue — drains one entry per idle slice so render is never blocked
+const _texQueue = [];
+let _texDraining = false;
+const _scheduleIdle = typeof requestIdleCallback !== 'undefined'
+  ? fn => requestIdleCallback(fn, { timeout: 3000 })
+  : fn => setTimeout(fn, 0);
+
+function _drainTexQueue() {
+  const entry = _texQueue.shift();
+  if (!entry) { _texDraining = false; return; }
+  const { key, hlEl, shEl } = entry;
+  // Skip if the card was removed from DOM before we got here
+  if (!hlEl.isConnected) { _scheduleIdle(_drainTexQueue); return; }
+  const textures = generateFoldTextures();
+  if (textureCache.size >= TEXTURE_CACHE_MAX) textureCache.delete(textureCache.keys().next().value);
+  textureCache.set(key, textures);
+  try { localStorage.setItem(TEXTURE_STORE_PREFIX + key, JSON.stringify(textures)); } catch {}
+  hlEl.style.backgroundImage = `url(${textures.hl})`;
+  shEl.style.backgroundImage = `url(${textures.sh})`;
+  if (_texQueue.length) _scheduleIdle(_drainTexQueue);
+  else _texDraining = false;
+}
+
+// getCachedTextures(key) — synchronous fast path (L1/L2 hit)
+// getCachedTextures(key, hlEl, shEl) — deferred generation on L3 miss; returns null
+function getCachedTextures(key, hlEl, shEl) {
   // L1: in-memory LRU
   if (textureCache.has(key)) {
     const val = textureCache.get(key);
@@ -200,7 +225,13 @@ function getCachedTextures(key) {
       return textures;
     }
   } catch {}
-  // L3: generate fresh, then persist
+  // L3: deferred if DOM elements supplied, synchronous otherwise
+  if (hlEl && shEl) {
+    _texQueue.push({ key, hlEl, shEl });
+    if (!_texDraining) { _texDraining = true; _scheduleIdle(_drainTexQueue); }
+    return null;
+  }
+  // Synchronous fallback (rec poster, NWW — single element, not bulk)
   if (textureCache.size >= TEXTURE_CACHE_MAX) textureCache.delete(textureCache.keys().next().value);
   const textures = generateFoldTextures();
   textureCache.set(key, textures);
@@ -260,6 +291,15 @@ function renderStandardsSection() {
       removeBtn.addEventListener('click', () => {
         const updated = loadStandards().filter(m => m.title !== movie.title);
         saveStandards(updated);
+        // Move to front of collection so it appears first when returning
+        const idx = movies.findIndex(m => m.title === movie.title);
+        if (idx !== -1) {
+          movies.unshift(movies.splice(idx, 1)[0]);
+        } else {
+          // Movie was dropped from movies[] by syncOrderFromDOM (pre-fix) — re-insert it
+          movies.unshift({ title: movie.title, year: movie.year, director: movie.director, poster: movie.poster });
+        }
+        saveMovies();
         markDirty('collection');
         setGridView('collection');
         renderGridNav();
@@ -1410,7 +1450,7 @@ const NAV_ICONS = {
   watchlist:  '🍿',
   maybe:      '<img src="wildcard.webp" style="width:24px;height:24px;object-fit:contain;vertical-align:middle">',
   meh:        '😐',
-  banned:     '👻',
+  banned:     '🪦',
 };
 
 async function updateSortable(view) {
@@ -1829,13 +1869,16 @@ function loadMovies() {
 
 function syncOrderFromDOM() {
   const cards = getGrid('collection').querySelectorAll('.movie-card');
+  // Standards are excluded from the grid but must stay in movies[]
+  const standardTitles = new Set(loadStandards().map(m => m.title));
+  const standardMovies = movies.filter(m => standardTitles.has(m.title));
   const newOrder = [];
   cards.forEach(card => {
     const title = card.querySelector('.card-name').textContent;
     const movie = movies.find(m => m.title === title);
     if (movie) newOrder.push(movie);
   });
-  movies.splice(0, movies.length, ...newOrder);
+  movies.splice(0, movies.length, ...newOrder, ...standardMovies);
   saveMovies();
 }
 
@@ -1920,32 +1963,37 @@ function openMovieModal(movie, list = null) {
         <div class="mm-loading-bar mm-skel-rating"></div>
         <div class="mm-loading-bar mm-skel-rating"></div>
       </div>
+      <div class="mm-loading-bar mm-skel-watch-btn"></div>
     </div>
     <div class="mm-info">
-      <div class="mm-title">${movie.title}</div>
-      <div class="mm-meta">${[movie.director, movie.year].filter(Boolean).join(' · ')}</div>
-      <div class="mm-tabs mm-tabs-skel">
-        <div class="mm-tab mm-tab-active">Details</div>
-        <div class="mm-tab">Session</div>
+      <div class="mm-info-header">
+        <div class="mm-title-row"><div class="mm-title">${movie.title}</div></div>
+        <div class="mm-meta">${[movie.director, movie.year].filter(Boolean).join(' · ')}</div>
+        <div class="mm-tabs mm-tabs-skel">
+          <div class="mm-tab mm-tab-active">Details</div>
+          <div class="mm-tab">Session</div>
+        </div>
       </div>
-      <div class="mm-genres">
-        <div class="mm-loading-bar mm-skel-tag"></div>
-        <div class="mm-loading-bar mm-skel-tag"></div>
-        <div class="mm-loading-bar mm-skel-tag"></div>
-      </div>
-      <div class="mm-loading-bar mm-skel-tagline"></div>
-      <div class="mm-loading-bar" style="margin-top:16px"></div>
-      <div class="mm-loading-bar" style="width:95%;margin-top:6px"></div>
-      <div class="mm-loading-bar" style="width:88%;margin-top:6px"></div>
-      <div class="mm-loading-bar" style="width:80%;margin-top:6px"></div>
-      <div class="mm-loading-bar" style="width:60%;margin-top:6px"></div>
-      <div class="mm-section-label mm-skel-label"></div>
-      <div class="mm-cast">
-        ${Array(7).fill('<div class="mm-cast-item"><div class="mm-cast-photo mm-skel-circle"></div><div class="mm-loading-bar mm-skel-cast-name"></div><div class="mm-loading-bar mm-skel-cast-char"></div></div>').join('')}
-      </div>
-      <div class="mm-section-label mm-skel-label"></div>
-      <div class="mm-crew">
-        ${Array(4).fill('<div class="mm-crew-row"><div class="mm-loading-bar mm-skel-crew-role"></div><div class="mm-loading-bar mm-skel-crew-name"></div></div>').join('')}
+      <div class="mm-tab-content">
+        <div class="mm-genres">
+          <div class="mm-loading-bar mm-skel-tag"></div>
+          <div class="mm-loading-bar mm-skel-tag"></div>
+          <div class="mm-loading-bar mm-skel-tag"></div>
+        </div>
+        <div class="mm-loading-bar mm-skel-tagline"></div>
+        <div class="mm-loading-bar mm-skel-overview" style="margin-top:16px"></div>
+        <div class="mm-loading-bar mm-skel-overview" style="width:95%"></div>
+        <div class="mm-loading-bar mm-skel-overview" style="width:88%"></div>
+        <div class="mm-loading-bar mm-skel-overview" style="width:80%"></div>
+        <div class="mm-loading-bar mm-skel-overview" style="width:60%"></div>
+        <div class="mm-section-label mm-skel-label"></div>
+        <div class="mm-cast">
+          ${Array(7).fill('<div class="mm-cast-item"><div class="mm-cast-photo mm-skel-circle"></div><div class="mm-loading-bar mm-skel-cast-name"></div><div class="mm-loading-bar mm-skel-cast-char"></div><div class="mm-loading-bar mm-skel-cast-char mm-skel-cast-char--2"></div></div>').join('')}
+        </div>
+        <div class="mm-section-label mm-skel-label"></div>
+        <div class="mm-crew">
+          ${Array(5).fill('<div class="mm-crew-row"><div class="mm-loading-bar mm-skel-crew-role"></div><div class="mm-loading-bar mm-skel-crew-name"></div></div>').join('')}
+        </div>
       </div>
     </div>`;
 
@@ -2008,6 +2056,30 @@ function renderModalDetails(body, movie, data) {
     getPastSessions: () => {
       try { return JSON.parse(localStorage.getItem(TASTE_SIGNALS_KEY) || '[]'); } catch { return []; }
     },
+    onSendChat: async (message, chatHistory) => {
+      const res = await fetch('/api/companion-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: movie.title, year: movie.year, director: movie.director,
+          runtime: data.runtime, elapsed_pct: 0,
+          message, chat_history: chatHistory,
+          spoilers_ok: false, model: getRecModel(),
+        }),
+      });
+      return res.ok ? res.json() : { error: true };
+    },
+    onGenerateFact: async (m) => {
+      const res = await fetch('/api/companion-facts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: m.title, year: m.year, director: m.director,
+          runtime: data.runtime, spoilers_ok: false, model: getRecModel(),
+        }),
+      });
+      return res.ok ? res.json() : { facts: [] };
+    },
   });
 }
 
@@ -2034,6 +2106,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape')      closeMovieModal();
   if (e.key === 'ArrowLeft')   modalNavigate(-1);
   if (e.key === 'ArrowRight')  modalNavigate(1);
+  const inInput = e.target.closest('input, textarea, [contenteditable]');
+  if (!inInput && (e.key === '[' || e.key === ']')) {
+    const tabs = [...document.querySelectorAll('#movie-modal-body .mm-tab')];
+    const activeIdx = tabs.findIndex(t => t.classList.contains('mm-tab-active'));
+    const next = (activeIdx + (e.key === ']' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[next]?.click();
+  }
 });
 
 // ── Now Watching Widget ──────────────────────────────────────────────────────
@@ -2644,6 +2723,8 @@ function nwwToIdle() {
   nwwSetState('idle');
   nww.el.classList.remove('nww--complete', 'nww--companion-open');
   nwwRenderCompanion(null);
+  markDirty(gridView);
+  setGridView(gridView);
 }
 
 function nwwCommitDecision(target) {
@@ -2651,6 +2732,11 @@ function nwwCommitDecision(target) {
   if (!data) return;
   const src = data.sourceView;
   const title = data.title;
+
+  // Clear session before re-rendering so the live border is gone immediately
+  nwwStopInterval();
+  nwwExtractTasteSignal(data, target);
+  clearNowWatching();
 
   if (src === 'search') {
     // Film not in any list — insert directly
@@ -2673,10 +2759,6 @@ function nwwCommitDecision(target) {
     setGridView(gridView);
     renderGridNav();
   }
-
-  nwwStopInterval();
-  nwwExtractTasteSignal(data, target);
-  clearNowWatching();
 
   // Show confirmation
   const labels = { collection: 'Collection', meh: 'Meh', banned: "Don't Recommend" };

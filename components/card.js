@@ -40,15 +40,19 @@ const CardComponent = (() => {
 
   // ── Fold textures ──────────────────────────────────────────────────────────
   function addTexturesToPoster(posterWrap, key) {
-    const textures = getCachedTextures(key);
     const hlDiv = document.createElement('div');
     hlDiv.className = 'poster-texture poster-texture-hl';
-    hlDiv.style.backgroundImage = `url(${textures.hl})`;
     const shDiv = document.createElement('div');
     shDiv.className = 'poster-texture poster-texture-sh';
-    shDiv.style.backgroundImage = `url(${textures.sh})`;
     posterWrap.appendChild(hlDiv);
     posterWrap.appendChild(shDiv);
+    // Pass DOM elements so getCachedTextures can defer generation on cache miss
+    const textures = getCachedTextures(key, hlDiv, shDiv);
+    if (textures) {
+      hlDiv.style.backgroundImage = `url(${textures.hl})`;
+      shDiv.style.backgroundImage = `url(${textures.sh})`;
+    }
+    // null → deferred; backgroundImage will be set when the idle queue drains
   }
 
   // ── IMDb / RT rating badges ────────────────────────────────────────────────
@@ -171,9 +175,19 @@ const CardComponent = (() => {
     titleEl.className = 'card-name';
     titleEl.textContent = movie.title;
 
-    const meta = document.createElement('span');
+    const meta = document.createElement('div');
     meta.className = 'card-trade';
-    meta.textContent = [movie.director, movie.year].filter(Boolean).join(', ');
+
+    const directorEl = document.createElement('span');
+    directorEl.className = 'card-director';
+    directorEl.textContent = movie.director || '';
+
+    const yearEl = document.createElement('span');
+    yearEl.className = 'card-year';
+    yearEl.textContent = movie.year || '';
+
+    if (movie.director) meta.appendChild(directorEl);
+    if (movie.year) meta.appendChild(yearEl);
 
     info.appendChild(titleEl);
     info.appendChild(meta);

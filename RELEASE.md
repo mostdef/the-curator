@@ -2,6 +2,21 @@
 
 ---
 
+## Latest — 2026-03-31
+
+### Modal — Loading Skeleton
+- Skeleton now precisely matches the real modal layout: correct heights for rating badges, watch button, tagline, overview lines, cast photos, and section labels
+- Cast character names now show two stacked bars to account for wrapping (e.g. long character names no longer cause a height jump on load)
+- Crew skeleton increased to 5 items to match the P75 of real film data — prevents a full extra row appearing after load
+- Fixed structural mismatch where skeleton was flat while real component has a sticky header + scrollable content wrapper — eliminated a 12px shift on every modal open
+
+### Modal — Tab Switching
+- Fixed Session tab height: the height of the Details tab is now locked in before switching, so the Session tab always matches it — previously only worked after switching back and forth once
+- Added keyboard shortcut `[` / `]` to switch between Details and Session tabs without reaching for the mouse
+- Pressing `]` on the last tab wraps around to the first (and vice versa for `[`)
+
+---
+
 ## Latest — 2026-03-30
 
 ### Component Sandbox

@@ -30,6 +30,30 @@ const ModalComponent = (() => {
     return [];
   }
 
+  // ── Collapsible section helper ───────────────────────────────────────────────
+
+  function makeSection(container, labelText, buildFn, { marginTop = '24px' } = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mm-section';
+    wrap.style.marginTop = marginTop;
+
+    const toggle = document.createElement('button');
+    toggle.className = 'mm-section-label mm-section-toggle';
+    toggle.innerHTML = `<span>${labelText}</span><svg class="mm-section-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l4 4 4-4"/></svg>`;
+
+    const body = document.createElement('div');
+    body.className = 'mm-section-body';
+    buildFn(body);
+
+    toggle.addEventListener('click', () => {
+      const collapsed = wrap.classList.toggle('mm-section--collapsed');
+      body.hidden = collapsed;
+    });
+
+    wrap.append(toggle, body);
+    container.appendChild(wrap);
+  }
+
   // ── Tab: Details ────────────────────────────────────────────────────────────
 
   function renderDetailsContent(container, movie, data) {
@@ -117,6 +141,138 @@ const ModalComponent = (() => {
     }
   }
 
+  // ── Empty session: interactive chat + fact generation ───────────────────────
+
+  function mmRenderEmptySession(container, movie, options) {
+    const { onSendChat, onGenerateFact, mmSession } = options;
+
+    // Facts area
+    const factsArea = document.createElement('div');
+    factsArea.className = 'mm-es-facts';
+
+    function renderFacts() {
+      factsArea.innerHTML = '';
+      if (mmSession.factsLoading) {
+        const loading = document.createElement('div');
+        loading.className = 'mm-es-facts-loading';
+        loading.textContent = 'Generating film notes…';
+        factsArea.appendChild(loading);
+        return;
+      }
+      mmSession.facts.forEach(f => {
+        const card = document.createElement('div');
+        card.className = 'mm-session-fact';
+        card.innerHTML = `<div class="mm-session-fact-pct">~${f.pct}% in</div><div class="mm-session-fact-text">${f.text}</div>`;
+        factsArea.appendChild(card);
+      });
+    }
+    renderFacts();
+
+    // Chat thread
+    const thread = document.createElement('div');
+    thread.className = 'mm-es-thread';
+
+    function appendBubble(role, text, isError) {
+      const bubble = document.createElement('div');
+      bubble.className = `mm-session-msg mm-session-msg-${role}${isError ? ' mm-msg-error' : ''}`;
+      bubble.textContent = text;
+      thread.appendChild(bubble);
+      thread.scrollTop = thread.scrollHeight;
+      return bubble;
+    }
+
+    function appendTyping() {
+      const el = document.createElement('div');
+      el.className = 'mm-session-msg mm-session-msg-assistant mm-es-typing';
+      el.innerHTML = '<span></span><span></span><span></span>';
+      thread.appendChild(el);
+      thread.scrollTop = thread.scrollHeight;
+      return el;
+    }
+
+    // Restore existing chat history from mmSession
+    mmSession.chatHistory.forEach(msg => appendBubble(msg.role, msg.content));
+
+    // Toolbar: generate fact button
+    const toolbar = document.createElement('div');
+    toolbar.className = 'mm-es-toolbar';
+
+    if (onGenerateFact) {
+      const factBtn = document.createElement('button');
+      factBtn.className = 'mm-es-fact-btn';
+      factBtn.textContent = 'Generate film notes';
+      factBtn.addEventListener('click', async () => {
+        if (mmSession.factsLoading) return;
+        mmSession.factsLoading = true;
+        factBtn.disabled = true;
+        renderFacts();
+        try {
+          const res = await onGenerateFact(movie);
+          mmSession.facts = res.facts || [];
+        } catch {
+          mmSession.facts = [];
+        }
+        mmSession.factsLoading = false;
+        factBtn.disabled = false;
+        renderFacts();
+      });
+      toolbar.appendChild(factBtn);
+    }
+
+    // Chat input
+    const inputRow = document.createElement('div');
+    inputRow.className = 'mm-es-input-row';
+
+    const input = document.createElement('textarea');
+    input.className = 'mm-es-input';
+    input.placeholder = 'Ask about this film…';
+    input.rows = 1;
+
+    const sendBtn = document.createElement('button');
+    sendBtn.className = 'mm-es-send-btn';
+    sendBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8H2M9 3l5 5-5 5"/></svg>';
+
+    async function sendMessage() {
+      if (!onSendChat) return;
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      input.style.height = '';
+      sendBtn.disabled = true;
+      appendBubble('user', msg);
+      mmSession.chatHistory.push({ role: 'user', content: msg });
+      const typing = appendTyping();
+      try {
+        const res = await onSendChat(msg, mmSession.chatHistory.slice(0, -1));
+        typing.remove();
+        if (res.error) {
+          appendBubble('assistant', 'Something went wrong — try again.', true);
+        } else {
+          appendBubble('assistant', res.reply);
+          mmSession.chatHistory.push({ role: 'assistant', content: res.reply });
+        }
+      } catch {
+        typing.remove();
+        appendBubble('assistant', 'Something went wrong — try again.', true);
+      }
+      sendBtn.disabled = false;
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      if (e.key === 'Escape') e.stopPropagation();
+    });
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+    });
+
+    inputRow.append(input, sendBtn);
+
+    container.append(factsArea, toolbar, thread, inputRow);
+  }
+
   // ── Tab: Session ────────────────────────────────────────────────────────────
 
   function renderSessionContent(container, movie, options) {
@@ -132,10 +288,7 @@ const ModalComponent = (() => {
     const chatHistory = sessionData?.chat_history || [];
 
     if (!sessionData) {
-      const empty = document.createElement('div');
-      empty.className = 'mm-session-empty';
-      empty.textContent = 'No companion session yet — start watching to build a history.';
-      container.appendChild(empty);
+      mmRenderEmptySession(container, movie, options);
       return;
     }
 
@@ -151,36 +304,29 @@ const ModalComponent = (() => {
 
     // Facts
     if (facts.length > 0) {
-      const label = document.createElement('div');
-      label.className = 'mm-section-label';
-      label.textContent = 'Film notes from this session';
-      container.appendChild(label);
-
-      facts.forEach(f => {
-        const card = document.createElement('div');
-        card.className = 'mm-session-fact';
-        card.innerHTML = `<div class="mm-session-fact-pct">~${f.pct}% in</div><div class="mm-session-fact-text">${f.text}</div>`;
-        container.appendChild(card);
-      });
+      makeSection(container, 'Film notes from this session', body => {
+        facts.forEach(f => {
+          const card = document.createElement('div');
+          card.className = 'mm-session-fact';
+          card.innerHTML = `<div class="mm-session-fact-pct">~${f.pct}% in</div><div class="mm-session-fact-text">${f.text}</div>`;
+          body.appendChild(card);
+        });
+      }, { marginTop: '0' });
     }
 
     // Chat history
     if (chatHistory.length > 0) {
-      const label = document.createElement('div');
-      label.className = 'mm-section-label';
-      label.style.marginTop = facts.length > 0 ? '28px' : '0';
-      label.textContent = 'Conversation';
-      container.appendChild(label);
-
-      const thread = document.createElement('div');
-      thread.className = 'mm-session-thread';
-      chatHistory.forEach(msg => {
-        const bubble = document.createElement('div');
-        bubble.className = `mm-session-msg mm-session-msg-${msg.role}`;
-        bubble.textContent = msg.content;
-        thread.appendChild(bubble);
-      });
-      container.appendChild(thread);
+      makeSection(container, 'Conversation', body => {
+        const thread = document.createElement('div');
+        thread.className = 'mm-session-thread';
+        chatHistory.forEach(msg => {
+          const bubble = document.createElement('div');
+          bubble.className = `mm-session-msg mm-session-msg-${msg.role}`;
+          bubble.textContent = msg.content;
+          thread.appendChild(bubble);
+        });
+        body.appendChild(thread);
+      }, { marginTop: facts.length > 0 ? '28px' : '0' });
     }
 
     // Past sessions count
@@ -207,6 +353,8 @@ const ModalComponent = (() => {
    * @param {Function}    [options.onWatchTonight]              - called when Watch Tonight clicked
    * @param {Function}    [options.getActiveSessions]           - () => now-watching data | null
    * @param {Function}    [options.getPastSessions]             - () => array of past signals
+   * @param {Function}    [options.onSendChat]                  - async (message, chatHistory) => { reply } | null
+   * @param {Function}    [options.onGenerateFact]              - async (movie) => { facts: [{pct,text}] } | null
    */
   function renderModal(container, movie, data, options = {}) {
     const {
@@ -214,9 +362,14 @@ const ModalComponent = (() => {
       onWatchTonight = null,
       getActiveSessions = () => null,
       getPastSessions = () => [],
+      onSendChat = null,
+      onGenerateFact = null,
     } = options;
 
-    const resolvedOptions = { getActiveSessions, getPastSessions };
+    // In-memory session state — persists across tab switches for this modal's lifetime
+    const mmSession = { chatHistory: [], facts: [], factsLoading: false };
+
+    const resolvedOptions = { getActiveSessions, getPastSessions, onSendChat, onGenerateFact, mmSession };
 
     container.innerHTML = '';
 
@@ -239,14 +392,14 @@ const ModalComponent = (() => {
         imdbLink.href = data.imdb_id ? `https://www.imdb.com/title/${data.imdb_id}` : '#';
         imdbLink.target = '_blank';
         imdbLink.rel = 'noopener noreferrer';
-        imdbLink.innerHTML = `<span class="mm-rating-logo">IMDb</span><span>⭐ ${data.imdb_rating}</span>`;
+        imdbLink.innerHTML = `<span class="mm-rating-logo">IMDb</span><span>${data.imdb_rating}</span>`;
         ratings.appendChild(imdbLink);
       }
       if (data.rt_score) {
         const pct = parseInt(data.rt_score);
         const fresh = pct >= 60;
         const rt = document.createElement('a');
-        rt.className = 'mm-rating-badge mm-rating-rt';
+        rt.className = `mm-rating-badge mm-rating-rt ${fresh ? 'mm-rating-rt--fresh' : 'mm-rating-rt--rotten'}`;
         rt.href = `https://www.rottentomatoes.com/search?search=${encodeURIComponent(movie.title)}`;
         rt.target = '_blank';
         rt.rel = 'noopener noreferrer';
@@ -291,9 +444,11 @@ const ModalComponent = (() => {
       liveBadge.textContent = '● Session in progress';
       titleRow.appendChild(liveBadge);
     }
-    info.append(titleRow, meta);
+    // ── Sticky header (title + meta + tabs) ───────────────────────────────────
+    const infoHeader = document.createElement('div');
+    infoHeader.className = 'mm-info-header';
+    infoHeader.append(titleRow, meta);
 
-    // ── Tab bar ────────────────────────────────────────────────────────────────
     const hasSession = sessions.length > 0 || !!activeSession;
 
     const tabBar = document.createElement('div');
@@ -308,27 +463,37 @@ const ModalComponent = (() => {
     sessionTab.innerHTML = hasSession ? 'Session <span class="mm-tab-dot"></span>' : 'Session';
 
     tabBar.append(detailsTab, sessionTab);
-    info.appendChild(tabBar);
+    infoHeader.appendChild(tabBar);
+    info.appendChild(infoHeader);
 
     // ── Tab content ────────────────────────────────────────────────────────────
     const tabContent = document.createElement('div');
     tabContent.className = 'mm-tab-content';
     info.appendChild(tabContent);
 
+    let detailsContentHeight = 0;
+
     function showTab(which) {
       detailsTab.classList.toggle('mm-tab-active', which === 'details');
       sessionTab.classList.toggle('mm-tab-active', which === 'session');
+      infoHeader.classList.toggle('mm-info-header--no-shadow', which === 'details');
       tabContent.innerHTML = '';
-      if (which === 'details') renderDetailsContent(tabContent, movie, data);
-      else renderSessionContent(tabContent, movie, resolvedOptions);
+      if (which === 'details') {
+        renderDetailsContent(tabContent, movie, data);
+        detailsContentHeight = tabContent.scrollHeight;
+        tabContent.style.minHeight = '';
+      } else {
+        if (detailsContentHeight > 0) tabContent.style.minHeight = detailsContentHeight + 'px';
+        renderSessionContent(tabContent, movie, resolvedOptions);
+      }
     }
 
     detailsTab.addEventListener('click', () => showTab('details'));
     sessionTab.addEventListener('click', () => showTab('session'));
 
-    showTab(initialTab);
-
     container.append(posterCol, info);
+
+    showTab(initialTab);
   }
 
   return { renderModal, renderDetailsContent, renderSessionContent, mmNormalizeTitle, mmGetSessions, mmGetActiveSession };
