@@ -2,6 +2,27 @@
 
 ---
 
+## Latest — 2026-03-30
+
+### Component Sandbox
+- Extracted `CardComponent`, `ModalComponent`, `NWWComponent` as standalone IIFE modules in `components/`
+- Added `sandbox/` — isolated component gallery with interactive controls and all permutations per component
+- Sandbox accessible at `/sandbox/` in dev; blocked from production via `vercel.json`
+
+### Performance
+- Render from localStorage immediately on init — grid visible before auth or cloud sync completes
+- Supabase SDK and SortableJS removed from critical path — loaded dynamically after first paint
+- Added `defer` to all script tags for parallel downloads
+- Fold textures persisted to localStorage — generated once per movie, loaded instantly on every subsequent reload
+
+### UI Polish
+- Golden travelling border on cards with an active watch session (`@property` conic-gradient animation)
+- Session-in-progress indicator moved to title level in movie modal
+- Tilt/hover effect applied consistently across all grid views (Watchlist, Wildcard, Meh, Banned)
+- Director backfill for manually-added movies — resolved on next modal open
+
+---
+
 ## Latest — 2026-03-29
 
 ### Now Watching Widget
