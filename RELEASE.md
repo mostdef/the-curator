@@ -24,6 +24,9 @@
 - Sandbox poster images cached in localStorage — loads instantly after first visit instead of fetching on every open
 - Sandbox chrome updated to light theme to match the main app
 
+### Bug Fixes
+- Snapshots now work correctly after Supabase migration — local dev falls back to filesystem, production uses the database with proper auth
+
 ---
 
 ## Latest — 2026-03-29

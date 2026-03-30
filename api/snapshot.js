@@ -10,10 +10,13 @@ let supabase;
 try { supabase = require('./_supabase'); } catch {}
 
 module.exports = async function handler(req, res) {
-  // ── Supabase path (when auth + supabase are available) ───────────────────────
+  // ── Supabase path (when auth + supabase are available and user is real) ─────
   if (getAuthenticatedUser && supabase) {
     const user = await getAuthenticatedUser(req);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // 'local' is a stub returned when env vars are absent — fall through to filesystem
+    if (user.id === 'local') return handleFilesystem(req, res);
 
     if (req.method === 'POST') {
       const snap = req.body;
@@ -44,7 +47,11 @@ module.exports = async function handler(req, res) {
     return res.status(405).end();
   }
 
-  // ── Filesystem fallback (local dev / transition period) ───────────────────────
+  handleFilesystem(req, res);
+};
+
+// ── Filesystem fallback (local dev without Supabase auth) ─────────────────────
+function handleFilesystem(req, res) {
   if (req.method === 'POST') {
     const snap = req.body;
     const ts   = snap.ts || Date.now();
@@ -66,4 +73,4 @@ module.exports = async function handler(req, res) {
   }
 
   res.status(405).end();
-};
+}
