@@ -22,6 +22,20 @@
 ### Bug Fixes
 - Restored rotating gradient border on live cards and the pill — broken by `transform-style: preserve-3d` being incorrectly added to `.movie-card`, which caused browsers to silently ignore `overflow: hidden` and break `background-clip: border-box`
 
+### Anticipated
+- New list for tracking films before they are released — separate from the main five lists because these films cannot be watched yet
+- Add any upcoming film via search; TMDB fills in the theatrical release date automatically
+- Each card shows a countdown: "In N days", "Tomorrow", "Premieres today!", or "Out now"
+- Films are sorted chronologically, soonest premiere first
+- When a film's release date passes it stays in Anticipated and the nav button gains a dot and border — a quiet signal that something you were waiting for has arrived
+- Empty state shows five upcoming releases from TMDB with a load-more option for when nothing is compelling
+- Mutually exclusive with all other lists — a film cannot be anticipated and already in To Watch at the same time
+
+### Companion — LLM Signal Extraction
+- After a watch session with ≥2 chat turns, the conversation is analyzed in the background to extract structured signals: what you praised, what created friction, themes you engaged with, and how you tend to engage with films
+- Signals are written back to the taste history automatically — no action required
+- Curator agent updated to read and aggregate viewing signals across sessions, blending them into the taste profile and recommendation prompt
+
 ---
 
 ## Latest — 2026-03-31

@@ -12,7 +12,7 @@ const PERSONA_HIDDEN_KEY = 'thecollection_persona_hidden';
 function isPersonaHidden() { return localStorage.getItem(PERSONA_HIDDEN_KEY) === '1'; }
 function setPersonaHidden(v) { localStorage.setItem(PERSONA_HIDDEN_KEY, v ? '1' : '0'); }
 
-const VIEWS = ['collection','watchlist','maybe','meh','banned'];
+const VIEWS = ['collection','watchlist','maybe','meh','banned','anticipated'];
 const dirtyViews = new Set(VIEWS);
 function getGrid(v) { return document.getElementById('grid-' + v); }
 function markDirty(v) { dirtyViews.add(v); }
@@ -1228,7 +1228,8 @@ const MEH_KEY        = 'thecollection_meh';
 const SNAPSHOTS_KEY  = 'thecollection_snapshots';
 const STANDARDS_KEY  = 'thecollection_standards';
 const TOTAL_COST_KEY      = 'thecollection_total_cost';
-const TASTE_SIGNALS_KEY   = 'thecollection_taste_signals';
+const TASTE_SIGNALS_KEY     = 'thecollection_taste_signals';
+const ANTICIPATED_KEY       = 'thecollection_anticipated';
 totalCost = parseFloat(localStorage.getItem(TOTAL_COST_KEY) || '0') || 0;
 
 // ── Supabase sync ─────────────────────────────────────────────────────────────
@@ -1399,10 +1400,43 @@ function saveMeh(list) {
   schedulePush();
 }
 
+function loadAnticipated() {
+  try { return JSON.parse(localStorage.getItem(ANTICIPATED_KEY) || '[]'); } catch { return []; }
+}
+function saveAnticipated(list) {
+  localStorage.setItem(ANTICIPATED_KEY, JSON.stringify(list));
+  schedulePush();
+}
+function daysUntil(releaseDate) {
+  if (!releaseDate) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const rel   = new Date(releaseDate + 'T00:00:00');
+  return Math.round((rel - today) / 86400000);
+}
+function hasReleasedAnticipated() {
+  return loadAnticipated().some(m => daysUntil(m.release_date) <= 0);
+}
+
+// Remove a title from all other lists so Anticipated is mutually exclusive
+function removeFromOtherLists(title) {
+  const norm = t => t.toLowerCase().trim();
+  const n = norm(title);
+  const m = movies.filter(f => norm(f.title) !== n);
+  if (m.length !== movies.length) { movies = m; saveMovies(); }
+  const wl = loadWatchlist().filter(f => norm(f.title) !== n);
+  saveWatchlist(wl);
+  const my = loadMaybe().filter(f => norm(f.title) !== n);
+  saveMaybe(my);
+  const mh = loadMeh().filter(f => norm(f.title) !== n);
+  saveMeh(mh);
+  const bn = loadBanned().filter(f => norm(f.title) !== n);
+  saveBanned(bn);
+}
+
 const BAN_SVG_SM = '❌';
 const BAN_SVG_LG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="56" height="56" fill="none"><circle cx="12" cy="12" r="9.5" stroke="rgba(255,50,50,0.92)" stroke-width="2.5"/><line x1="5.1" y1="5.1" x2="18.9" y2="18.9" stroke="rgba(255,50,50,0.92)" stroke-width="2.5" stroke-linecap="round"/></svg>';
 
-let gridView = 'collection'; // 'collection' | 'watchlist' | 'maybe' | 'banned'
+let gridView = 'collection'; // 'collection' | 'watchlist' | 'maybe' | 'banned' | 'anticipated'
 let sortableInstance;
 let sortableView = null;
 let currentSaveOrder = null;
@@ -1448,11 +1482,12 @@ function sortedList(list, view) {
 }
 
 const NAV_ICONS = {
-  collection: '<img src="curtain.png" style="width:24px;height:24px;object-fit:contain;vertical-align:middle">',
-  watchlist:  '🍿',
-  maybe:      '<img src="wildcard.webp" style="width:24px;height:24px;object-fit:contain;vertical-align:middle">',
-  meh:        '😐',
-  banned:     '🪦',
+  collection:  '<img src="curtain.png" style="width:24px;height:24px;object-fit:contain;vertical-align:middle">',
+  watchlist:   '🍿',
+  maybe:       '<img src="wildcard.webp" style="width:24px;height:24px;object-fit:contain;vertical-align:middle">',
+  meh:         '😐',
+  banned:      '🪦',
+  anticipated: '🎬',
 };
 
 async function updateSortable(view) {
@@ -1579,8 +1614,10 @@ function setGridView(view) {
     else if (view === 'maybe') renderMaybeGrid();
     else if (view === 'meh') renderMehGrid();
     else if (view === 'banned') renderBannedGrid();
+    else if (view === 'anticipated') renderAnticipated();
     applyGrain();
   }
+  if (view === 'anticipated') renderAnticipated();
   updateSortable(view);
   renderGridNav();
 }
@@ -1598,11 +1635,12 @@ function invalidateTabCounts() { _tabCountCache = null; }
 function getTabCounts() {
   if (!_tabCountCache) {
     _tabCountCache = {
-      collection: movies.length,
-      watchlist:  loadWatchlist().length,
-      maybe:      loadMaybe().length,
-      meh:        loadMeh().length,
-      banned:     loadBanned().length,
+      collection:  movies.length,
+      watchlist:   loadWatchlist().length,
+      maybe:       loadMaybe().length,
+      meh:         loadMeh().length,
+      banned:      loadBanned().length,
+      anticipated: loadAnticipated().length,
     };
   }
   return _tabCountCache;
@@ -1649,6 +1687,23 @@ function buildNavButtons(container, compact = false) {
       tabRow.appendChild(btn);
     });
 
+    // Anticipated — separated from main tabs with a visual divider
+    const anticipatedSep = document.createElement('div');
+    anticipatedSep.className = 'grid-nav-sep';
+    tabRow.appendChild(anticipatedSep);
+
+    const anticipatedBtn = document.createElement('button');
+    anticipatedBtn.dataset.key = 'anticipated';
+    anticipatedBtn.className = 'grid-nav-btn grid-nav-btn--anticipated' + (compact ? ' compact' : '');
+    anticipatedBtn.addEventListener('click', () => {
+      setGridView('anticipated');
+      const el = document.getElementById('grid-nav');
+      const headerH = document.querySelector('header')?.offsetHeight || 0;
+      const top = el.getBoundingClientRect().top + window.scrollY - headerH - 16;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+    tabRow.appendChild(anticipatedBtn);
+
     const tabRowWrap = document.createElement('div');
     tabRowWrap.className = 'grid-nav-tab-row';
     tabRowWrap.appendChild(tabRow);
@@ -1664,8 +1719,17 @@ function buildNavButtons(container, compact = false) {
     const key = btn.dataset.key;
     const count = getTabCount(key);
     const active = gridView === key;
-    btn.className = 'grid-nav-btn' + (active ? ' active' : '') + (compact ? ' compact' : '');
-    btn.innerHTML = `<span class="grid-nav-icon">${NAV_ICONS[key]}</span><span>${NAV_TABS.find(t=>t.key===key).label}</span>${count ? `<span class="grid-nav-count">${count}</span>` : ''}`;
+    const isAnticipated = key === 'anticipated';
+    const released = isAnticipated && hasReleasedAnticipated();
+    const allTabs = [...NAV_TABS, { key: 'anticipated', label: 'Anticipated' }];
+    btn.className = [
+      'grid-nav-btn',
+      isAnticipated ? 'grid-nav-btn--anticipated' : '',
+      active ? 'active' : '',
+      released ? 'grid-nav-btn--alert' : '',
+      compact ? 'compact' : '',
+    ].filter(Boolean).join(' ');
+    btn.innerHTML = `<span class="grid-nav-icon">${NAV_ICONS[key]}</span><span>${allTabs.find(t=>t.key===key)?.label}</span>${count ? `<span class="grid-nav-count">${count}</span>` : ''}${released ? '<span class="grid-nav-dot"></span>' : ''}`;
   });
 
   // Slide the indicator
@@ -1876,6 +1940,138 @@ function renderMehGrid() {
   });
   applyGrain();
   markClean('meh');
+}
+
+let _upcomingPage = 1;
+let _upcomingSuggestions = [];
+let _upcomingLoading = false;
+
+async function fetchUpcomingSuggestions(page = 1) {
+  if (_upcomingLoading) return;
+  _upcomingLoading = true;
+  try {
+    const res = await fetch(`/api/search-movie?type=upcoming&page=${page}`);
+    if (!res.ok) return;
+    const json = await res.json();
+    const existing = new Set(loadAnticipated().map(m => m.title.toLowerCase()));
+    const fresh = (json.results || []).filter(m => !existing.has(m.title.toLowerCase()));
+    _upcomingSuggestions = fresh;
+    _upcomingPage = page;
+    renderAnticipated();
+  } catch {} finally { _upcomingLoading = false; }
+}
+
+function renderAnticipated() {
+  const g = getGrid('anticipated');
+  const list = loadAnticipated().slice().sort((a, b) => {
+    const da = daysUntil(a.release_date) ?? 9999;
+    const db = daysUntil(b.release_date) ?? 9999;
+    return da - db;
+  });
+
+  g.innerHTML = '';
+
+  if (!list.length) {
+    // Empty state
+    const empty = document.createElement('div');
+    empty.className = 'anticipated-empty';
+    empty.innerHTML = `
+      <p class="anticipated-empty-msg">Nothing anticipated yet.</p>
+      <button class="grid-add-btn" id="anticipated-add-btn">+ Add film</button>
+    `;
+    g.appendChild(empty);
+
+    empty.querySelector('#anticipated-add-btn').addEventListener('click', () => openSearchModal('anticipated'));
+
+    if (!_upcomingSuggestions.length && !_upcomingLoading) {
+      fetchUpcomingSuggestions(1);
+    } else if (_upcomingSuggestions.length) {
+      const sugWrap = document.createElement('div');
+      sugWrap.className = 'anticipated-suggestions';
+      sugWrap.innerHTML = '<p class="anticipated-suggestions-label">Coming soon</p>';
+      _upcomingSuggestions.forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'anticipated-suggestion-card';
+        card.innerHTML = `
+          ${m.poster ? `<img class="anticipated-suggestion-poster" src="${m.poster}" alt="" loading="lazy">` : '<div class="anticipated-suggestion-poster anticipated-suggestion-poster--empty"></div>'}
+          <div class="anticipated-suggestion-info">
+            <span class="anticipated-suggestion-title">${m.title}</span>
+            <span class="anticipated-suggestion-date">${formatReleaseDate(m.release_date)}</span>
+          </div>
+          <button class="anticipated-suggestion-add" data-title="${m.title}">+ Add</button>
+        `;
+        card.querySelector('.anticipated-suggestion-add').addEventListener('click', () => {
+          const list = loadAnticipated();
+          if (list.some(a => a.title.toLowerCase() === m.title.toLowerCase())) return;
+          removeFromOtherLists(m.title);
+          list.push({ title: m.title, year: m.year, poster: m.poster, release_date: m.release_date, addedAt: Date.now() });
+          saveAnticipated(list);
+          invalidateTabCounts();
+          renderAnticipated();
+          renderGridNav();
+        });
+        sugWrap.appendChild(card);
+      });
+
+      const loadMoreBtn = document.createElement('button');
+      loadMoreBtn.className = 'anticipated-load-more';
+      loadMoreBtn.textContent = 'Show more';
+      loadMoreBtn.addEventListener('click', () => fetchUpcomingSuggestions(_upcomingPage + 1));
+      sugWrap.appendChild(loadMoreBtn);
+
+      g.appendChild(sugWrap);
+    }
+    markClean('anticipated');
+    return;
+  }
+
+  // Add film button row
+  const addRow = document.createElement('div');
+  addRow.className = 'grid-sort-row';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'grid-add-btn';
+  addBtn.innerHTML = '+ Add film';
+  addBtn.addEventListener('click', () => openSearchModal('anticipated'));
+  addRow.appendChild(addBtn);
+  g.appendChild(addRow);
+
+  list.forEach(movie => {
+    const days = daysUntil(movie.release_date);
+    const released = days !== null && days <= 0;
+
+    const card = CardComponent.renderCard(movie, {
+      view: 'anticipated',
+      onRemove: () => {
+        const prev = loadAnticipated();
+        saveAnticipated(prev.filter(m => m.title !== movie.title));
+        invalidateTabCounts();
+        renderAnticipated();
+        renderGridNav();
+      },
+    });
+
+    // Inject countdown badge
+    const countdown = document.createElement('div');
+    countdown.className = 'anticipated-countdown' + (released ? ' anticipated-countdown--released' : '');
+    countdown.textContent = released
+      ? 'Out now'
+      : days === 0 ? 'Premieres today!'
+      : days === 1 ? 'Tomorrow'
+      : `In ${days} days`;
+    card.appendChild(countdown);
+    if (released) card.classList.add('anticipated-card--released');
+
+    g.appendChild(card);
+  });
+
+  applyGrain();
+  markClean('anticipated');
+}
+
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function saveMovies() {
@@ -2836,6 +3032,7 @@ function nwwExtractTasteSignal(data, decision) {
   const elapsedMs = nwwGetElapsed(data);
   const runtimeMs = (data.runtime || 0) * 60000;
   const elapsed_pct = runtimeMs > 0 ? Math.round((elapsedMs / runtimeMs) * 100) : null;
+  const chatHistory = data.companion?.chat_history || [];
   const signal = {
     timestamp:          Date.now(),
     title:              data.title,
@@ -2846,10 +3043,11 @@ function nwwExtractTasteSignal(data, decision) {
     runtime_min:        data.runtime || null,
     watch_duration_min: Math.round(elapsedMs / 60000),
     abandoned:          decision === 'banned' && elapsed_pct !== null && elapsed_pct < 50,
-    chat_turns:         Math.floor((data.companion?.chat_history?.length || 0) / 2),
+    chat_turns:         Math.floor(chatHistory.length / 2),
     source_view:        data.sourceView,
     facts:              (data.companion?.facts || []).filter(f => f.delivered),
-    chat_history:       data.companion?.chat_history || [],
+    chat_history:       chatHistory,
+    llm_signals:        null, // populated asynchronously by /api/companion-extract
   };
   try {
     const signals = JSON.parse(localStorage.getItem(TASTE_SIGNALS_KEY) || '[]');
@@ -2858,6 +3056,37 @@ function nwwExtractTasteSignal(data, decision) {
     localStorage.setItem(TASTE_SIGNALS_KEY, JSON.stringify(signals));
     schedulePush();
   } catch {}
+
+  // Fire-and-forget LLM extraction — only when there's a conversation to analyze
+  if (chatHistory.length >= 2) {
+    fetch('/api/companion-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:       'extract',
+        title:        data.title,
+        year:         data.year,
+        director:     data.director,
+        decision,
+        chat_history: chatHistory,
+        facts:        data.companion?.facts || [],
+      }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json?.signals) return;
+        try {
+          const signals = JSON.parse(localStorage.getItem(TASTE_SIGNALS_KEY) || '[]');
+          const entry = signals.find(s => s.title === data.title && s.timestamp === signal.timestamp);
+          if (entry) {
+            entry.llm_signals = json.signals;
+            localStorage.setItem(TASTE_SIGNALS_KEY, JSON.stringify(signals));
+            schedulePush();
+          }
+        } catch {}
+      })
+      .catch(() => {}); // non-critical — never fail the decision flow
+  }
 }
 
 // Companion event listeners
@@ -3432,14 +3661,17 @@ const searchResults  = document.getElementById('search-results');
 const VIEW_LOADERS = {
   collection: () => movies,
   watchlist: loadWatchlist, maybe: loadMaybe, meh: loadMeh, banned: loadBanned,
+  anticipated: loadAnticipated,
 };
 const VIEW_SAVERS = {
   collection: l => { movies.splice(0, movies.length, ...l); saveMovies(); },
   watchlist: saveWatchlist, maybe: saveMaybe, meh: saveMeh, banned: saveBanned,
+  anticipated: saveAnticipated,
 };
 const VIEW_RENDERERS = {
   collection: () => render(sortedList(movies, 'collection')),
   watchlist: renderWatchlistGrid, maybe: renderMaybeGrid, meh: renderMehGrid, banned: renderBannedGrid,
+  anticipated: renderAnticipated,
 };
 
 function openSearchModal(view) {
@@ -3464,8 +3696,10 @@ function renderSearchResults(hits) {
   }
   // Build title→view map once for O(1) lookups instead of loading all lists per row
   const titleToView = new Map();
-  Object.keys(VIEW_LOADERS).forEach(v => {
-    VIEW_LOADERS[v]().forEach(x => { if (!titleToView.has(x.title)) titleToView.set(x.title, v); });
+  [...Object.keys(VIEW_LOADERS), 'anticipated'].forEach(v => {
+    (VIEW_LOADERS[v] ? VIEW_LOADERS[v]() : loadAnticipated()).forEach(x => {
+      if (!titleToView.has(x.title)) titleToView.set(x.title, v);
+    });
   });
   hits.forEach(m => {
     const row = document.createElement('div');
@@ -3495,14 +3729,14 @@ function renderSearchResults(hits) {
       ratings.innerHTML += `<span class="search-rating-badge search-rating-rt">🍅 ${m.rt_score}</span>`;
     }
 
-    const VIEW_LABELS = { collection: 'Collection', watchlist: 'To Watch', maybe: 'Wildcard', meh: 'Meh', banned: "Don't Recommend" };
+    const VIEW_LABELS = { collection: 'Collection', watchlist: 'To Watch', maybe: 'Wildcard', meh: 'Meh', banned: "Don't Recommend", anticipated: 'Anticipated' };
     const existingView = titleToView.get(m.title);
 
     const addBtn = document.createElement('button');
     addBtn.className = 'search-add-btn';
 
     if (existingView) {
-      addBtn.textContent = `In ${VIEW_LABELS[existingView]}`;
+      addBtn.textContent = `In ${VIEW_LABELS[existingView] || existingView}`;
       addBtn.disabled = true;
       addBtn.classList.add('search-add-btn-exists');
     } else {
@@ -3511,6 +3745,35 @@ function renderSearchResults(hits) {
 
     const doAdd = () => {
       const view = searchTargetView;
+      if (view === 'anticipated') {
+        const ant = loadAnticipated();
+        if (ant.some(x => x.title === m.title)) { closeSearchModal(); return; }
+        removeFromOtherLists(m.title);
+        ant.unshift({
+          title:        m.title,
+          year:         m.year,
+          director:     '',
+          poster:       m.poster || '',
+          release_date: m.release_date || null,
+          addedAt:      Date.now(),
+        });
+        saveAnticipated(ant);
+        invalidateTabCounts();
+        renderAnticipated();
+        renderGridNav();
+        applyGrain();
+        closeSearchModal();
+        // Backfill director
+        fetch(`/api/movie-details?title=${encodeURIComponent(m.title)}&year=${encodeURIComponent(m.year || '')}`)
+          .then(r => r.json())
+          .then(d => {
+            if (!d.director) return;
+            const curr = loadAnticipated();
+            const entry = curr.find(x => x.title === m.title);
+            if (entry && !entry.director) { entry.director = d.director; saveAnticipated(curr); renderAnticipated(); }
+          }).catch(() => {});
+        return;
+      }
       const list = VIEW_LOADERS[view]();
       if (list.some(x => x.title === m.title)) { closeSearchModal(); return; }
       list.unshift({ title: m.title, year: m.year, director: '', poster: m.poster || '', addedAt: Date.now() });

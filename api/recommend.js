@@ -4,8 +4,18 @@ const Anthropic = require('@anthropic-ai/sdk');
 function loadTasteProfile() {
   try {
     const p = require('path').join(__dirname, '..', 'taste-profile.json');
-    return JSON.parse(require('fs').readFileSync(p, 'utf8')).prompt_section || null;
-  } catch { return null; }
+    const profile = JSON.parse(require('fs').readFileSync(p, 'utf8'));
+    const vs = profile.viewing_signals;
+    let viewingSignals = null;
+    if (vs && vs.session_count > 0) {
+      const parts = [vs.summary];
+      if (vs.liked_patterns?.length)    parts.push(`Praised: ${vs.liked_patterns.join('; ')}`);
+      if (vs.disliked_patterns?.length) parts.push(`Friction: ${vs.disliked_patterns.join('; ')}`);
+      if (vs.engagement_style?.length)  parts.push(`Engagement: ${vs.engagement_style.join('; ')}`);
+      viewingSignals = parts.join('\n');
+    }
+    return { promptSection: profile.prompt_section || null, viewingSignals };
+  } catch { return {}; }
 }
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -71,15 +81,18 @@ module.exports = async function handler(req, res) {
     .filter(([, count]) => count >= 3)
     .map(([d]) => d);
 
-  const tasteProfile = loadTasteProfile();
+  const { promptSection, viewingSignals } = loadTasteProfile();
 
   const buildPrompt = (extraInstruction = '') => [
     `You are a film recommendation engine. Analyze this curated movie collection and recommend exactly 5 distinct films the curator is missing. Only recommend feature films — never TV series, miniseries, or documentaries.`,
     standardsList
       ? `\n## REFERENCE FILMS\nThese are the curator's all-time favourites and define their taste most precisely. Weight these heavily above all else:\n${standardsList}`
       : '',
-    tasteProfile
-      ? `\n## TASTE PROFILE\n${tasteProfile}`
+    promptSection
+      ? `\n## TASTE PROFILE\n${promptSection}`
+      : '',
+    viewingSignals
+      ? `\n## VIEWING SIGNALS\n${viewingSignals}`
       : '',
     `\n## COLLECTION\nListed in curator's personal order — films appearing earlier carry more weight and reflect current taste more strongly:\n${movieList}`,
     excluded.length

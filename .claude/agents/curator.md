@@ -39,6 +39,13 @@ A file at `/Users/bartek/thecollection/taste-profile.json` with this structure:
     "formal_tendencies": ["cinematographic or structural preferences visible in the collection"],
     "underrepresented": ["genres/regions/eras the watchlist suggests they want to explore"],
     "reject_patterns": ["what the meh/banned lists reveal about what doesn't work for them"]
+  },
+  "viewing_signals": {
+    "summary": "1–2 sentence synthesis of patterns across all viewing sessions — how this person engages with films while watching, not just what they categorise.",
+    "liked_patterns": ["recurring things praised across sessions, distilled to patterns not per-film specifics"],
+    "disliked_patterns": ["recurring friction points across sessions"],
+    "engagement_style": ["how they tend to engage: e.g. 'asks about production context', 'focuses on character interiority', 'engages with political subtext'"],
+    "session_count": 0
   }
 }
 ```
@@ -154,6 +161,58 @@ For each list, the general interpretation remains:
 
 **Banned (rejected)**: The hard no. Cross-reference with meh — understand what tips something from disappointment to rejection.
 
+### Step 2b — Load and analyze viewing signals
+
+After analyzing the snapshot lists, check for viewing signals from companion sessions:
+
+```bash
+node -e "
+const ls = require('localStorage'); // not available in Node — read via user-data API instead
+" 2>/dev/null || true
+```
+
+Viewing signals live in `thecollection_taste_signals` in the user's localStorage. You cannot read localStorage directly — instead, if a Supabase `user_data` record exists, the push/pull mechanism syncs taste signals there. Check the latest snapshot for a `taste_signals` field, or note that you will skip this step if none are available.
+
+**If viewing signals are available** (passed as context by the user, or present in snapshot data):
+
+Each signal entry has this structure:
+```json
+{
+  "title": "Film Title",
+  "decision": "collection|meh|banned",
+  "chat_turns": 4,
+  "llm_signals": {
+    "liked": ["specific things praised"],
+    "disliked": ["specific things criticized"],
+    "themes_engaged": ["themes discussed"],
+    "emotional_reactions": ["emotional moments noted"],
+    "viewing_style_notes": ["how they engage with films"]
+  }
+}
+```
+
+Only entries with `llm_signals` present (non-null) carry the rich signal — entries without it have structural metadata only (decision, elapsed %, chat turns).
+
+Analyze signals that have `llm_signals`:
+- What do the `liked` arrays have in common across sessions? Distill to patterns, not per-film lists.
+- What do `disliked` arrays reveal? Are they consistent with the `reject_patterns` from list analysis, or do they add nuance?
+- What does `viewing_style_notes` reveal about how this person engages — production-focused, character-focused, political, formal?
+- Does `themes_engaged` reinforce or add to `dominant_themes`?
+- Cross-reference with decisions: does what they praised align with films they added to collection? What did they criticize in films they still kept?
+
+Populate `viewing_signals` in the profile:
+- `summary`: 1–2 sentences on how this viewer engages while watching
+- `liked_patterns`: distilled patterns (not per-film items)
+- `disliked_patterns`: recurring friction points
+- `engagement_style`: how they approach films intellectually
+- `session_count`: total number of signals (including those without llm_signals)
+
+**If no viewing signals are available**, set `viewing_signals` to `null` and note it in the report.
+
+**Bleed strong signals into existing dimensions**: if viewing signals consistently reinforce or contradict a dimension, update that dimension. For example, if a viewer repeatedly praises "practical effects over CGI" in `liked`, add that to `formal_tendencies`. If they consistently disengage from "romantic subplots", add that to `reject_patterns`.
+
+---
+
 ### Step 3 — Find the signature
 
 Ask yourself: if you had to describe this person's cinematic identity to a programmer who had never met them, in the most specific possible terms, what would you say? Not "they like crime films" but "they gravitate toward moral collapse narratives where systems of power corrupt individuals — Scorsese's Casino and Coppola's Godfather trilogy alongside Fincher's procedural coldness suggest they prize technical mastery over emotional warmth."
@@ -214,35 +273,39 @@ Write the complete JSON to `/Users/bartek/thecollection/taste-profile.json`.
 
 ### Step 6 — Update the recommendation API
 
-Read `/Users/bartek/thecollection/api/recommend.js`. Find the `buildPrompt` function. Add the taste profile injection after the REFERENCE FILMS section and before the COLLECTION section:
+Read `/Users/bartek/the-collection/api/recommend.js`. Find the `buildPrompt` function. It already injects `prompt_section` as `## TASTE PROFILE`. Additionally inject `viewing_signals` if present:
 
-The `buildPrompt` function should be updated to read `taste-profile.json` at the top of the handler (cache it in a module-level variable) and inject it as:
-
-```
-## TASTE PROFILE
-{taste-profile contents from prompt_section}
-```
-
-The exact edit: in `buildPrompt`, after the `standardsList` block, add:
+After the `## TASTE PROFILE` block, add:
 ```js
-tasteProfile
-  ? `\n## TASTE PROFILE\n${tasteProfile}`
+viewingSignals
+  ? `\n## VIEWING SIGNALS\n${viewingSignals}`
   : '',
 ```
 
-And at the top of the handler, add:
+Where `viewingSignals` is loaded alongside `tasteProfile` at module level:
 ```js
-const tasteProfile = (() => {
+function loadTasteProfile() {
   try {
     const p = require('path').join(__dirname, '..', 'taste-profile.json');
-    return require('fs').readFileSync(p, 'utf8');
-    // return the prompt_section field only
-    return JSON.parse(require('fs').readFileSync(p, 'utf8')).prompt_section || null;
-  } catch { return null; }
-})();
+    const profile = JSON.parse(require('fs').readFileSync(p, 'utf8'));
+    return {
+      prompt_section: profile.prompt_section || null,
+      viewing_signals: profile.viewing_signals || null,
+    };
+  } catch { return {}; }
+}
 ```
 
-(Fix the above — remove the duplicate return. The correct version reads the file, parses JSON, returns `.prompt_section`.)
+Format the `viewing_signals` injection as concise bullets:
+```
+## VIEWING SIGNALS
+${summary}
+- Praised: ${liked_patterns.join('; ')}
+- Friction: ${disliked_patterns.join('; ')}
+- Engagement: ${engagement_style.join('; ')}
+```
+
+Only inject if `session_count > 0` and at least one of the pattern arrays is non-empty.
 
 ### Step 7 — Report
 
@@ -253,19 +316,21 @@ After writing the files, output:
 2. **Profile impact**: how the delta shifted the profile — what's new, what's reinforced, what's weakened
 3. The `signature` field (the 2–3 sentence identity)
 4. The `dimensions` object as a readable summary
-5. **Insights**: print the COMPLETE `insights` text verbatim — do NOT summarize or abbreviate, output every word of the field as written to the JSON file
-6. **Prompt injection**: print the COMPLETE `prompt_section` text verbatim — do NOT summarize or abbreviate. Then verify it is under 200 words and uses the SEEK/AVOID/WEIGHT structure
-7. Confirm which files were written/updated
-8. Note any surprising patterns or tensions you found
+5. **Viewing signals**: if `viewing_signals` is non-null, print the `summary` and each pattern array. Note how many sessions contributed and whether any signals bled into existing dimensions.
+6. **Insights**: print the COMPLETE `insights` text verbatim — do NOT summarize or abbreviate, output every word of the field as written to the JSON file
+7. **Prompt injection**: print the COMPLETE `prompt_section` text verbatim — do NOT summarize or abbreviate. Then verify it is under 200 words and uses the SEEK/AVOID/WEIGHT structure
+8. Confirm which files were written/updated
+9. Note any surprising patterns or tensions you found
 
 **If fresh mode:**
 1. **Collection overview**: total films per list, notable stats
 2. The `signature` field (the 2–3 sentence identity)
 3. The `dimensions` object as a readable summary
-4. **Insights**: print the full `insights` text (the extended analysis)
-5. **Prompt injection**: print the full `prompt_section` text that will be injected into recommendation prompts — verify it is under 200 words and uses the SEEK/AVOID/WEIGHT structure
-6. Confirm which files were written/updated
-7. Note any surprising patterns or tensions you found
+4. **Viewing signals**: if `viewing_signals` is non-null, print the `summary` and patterns. Note how many sessions contributed.
+5. **Insights**: print the full `insights` text (the extended analysis)
+6. **Prompt injection**: print the full `prompt_section` text that will be injected into recommendation prompts — verify it is under 200 words and uses the SEEK/AVOID/WEIGHT structure
+7. Confirm which files were written/updated
+8. Note any surprising patterns or tensions you found
 
 ## When to re-run
 

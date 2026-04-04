@@ -31,6 +31,7 @@ api/
   search-movie.js    # OMDB movie search
   movie-details.js   # OMDB movie details
   snapshot.js        # Server-side snapshot save/load (./snapshots/)
+  upcoming.js        # TMDB /movie/upcoming wrapper — empty-state suggestions for Anticipated view
   persona.js         # Persona generation
   persona-image.js   # Persona image generation
   persona-stats.js   # Persona statistics
@@ -90,6 +91,7 @@ All keys prefixed `thecollection_`:
 | `thecollection_sort_*` | Per-view sort modes |
 | `thecollection_rec_cache` | Cached last recommendation |
 | `thecollection_taste_signals` | Watch session outcome signals (array, newest first, max 50) |
+| `thecollection_anticipated` | Anticipated list — `[{ title, year, director, poster, release_date, addedAt }]` sorted chronologically on render |
 | `thecollection_tex_<title>` | Persisted fold texture pair `{hl, sh}` as JPEG data URIs — generated once per movie, never regenerated unless cleared |
 
 ## Key Architecture Patterns
